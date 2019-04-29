@@ -202,6 +202,11 @@ public enum Parameter {
 	CSRF_PROTECTION_ENABLED("csrf-protection-enabled"),
 
 	/**
+	 * Valeur de l'entête http X-Frame-Options, par exemple, DENY, SAMEORIGIN, ALLOW-FROM http://example.com, ALLOWALL (SAMEORIGIN par défaut).
+	 */
+	X_FRAME_OPTIONS("x-frame-options"),
+
+	/**
 	 * Expression régulière (null par défaut) pour restreindre l'accès au monitoring à certaines adresses IP.
 	 */
 	ALLOWED_ADDR_PATTERN("allowed-addr-pattern"),
@@ -366,6 +371,11 @@ public enum Parameter {
 	 * for example "MyCompany/MyAppDomain" (null by default).
 	 */
 	CLOUDWATCH_NAMESPACE("cloudwatch-namespace"),
+
+	/**
+	 * Bucket name to use <a href='https://aws.amazon.com/s3/'>AWS S3</a> to send heap dump files (null by default).
+	 */
+	HEAP_DUMP_S3_BUCKETNAME("heap-dump-s3-bucketname"),
 
 	/**
 	 * URL of the <a href='https://www.influxdata.com/time-series-platform/'>InfluxDB</a> server to send metrics to,

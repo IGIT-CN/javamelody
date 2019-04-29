@@ -45,6 +45,10 @@ public class JavaMelodyConfigurationProperties {
 	 */
 	private String excludedDatasources;
 	/**
+	 * If /monitoring should be enabled for reports in the management http port instead of on the application http port.
+	 */
+	private boolean managementEndpointMonitoringEnabled;
+	/**
 	 * Map of initialization parameters to be passed to the JavaMelody monitoring filter.
 	 * The available parameters are listed here: https://github.com/javamelody/javamelody/wiki/UserGuide#6-optional-parameters
 	 */
@@ -75,6 +79,22 @@ public class JavaMelodyConfigurationProperties {
 	 */
 	public String getExcludedDatasources() {
 		return excludedDatasources;
+	}
+
+	/**
+	 * Returns if /monitoring should be enabled for reports in the management http port instead of on the application http port.
+	 * @return true or false
+	 */
+	public boolean isManagementEndpointMonitoringEnabled() {
+		return managementEndpointMonitoringEnabled;
+	}
+
+	/**
+	 * Sets whether /monitoring should be enabled for reports in the management http port instead of on the application http port.
+	 * @param managementEndpointEnabled true or false
+	 */
+	public void setManagementEndpointMonitoringEnabled(boolean managementEndpointEnabled) {
+		this.managementEndpointMonitoringEnabled = managementEndpointEnabled;
 	}
 
 	/**

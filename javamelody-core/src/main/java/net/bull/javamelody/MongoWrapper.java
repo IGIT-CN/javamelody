@@ -20,6 +20,7 @@ package net.bull.javamelody;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 
+import com.mongodb.MongoNamespace;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
@@ -92,7 +93,15 @@ public final class MongoWrapper {
 			Object result = method.invoke(database, args);
 			if (result instanceof MongoCollection && args != null && args.length > 0
 					&& args[0] instanceof String) {
-				result = createCollectionProxy((MongoCollection<?>) result, (String) args[0]);
+				final MongoCollection<?> collection = (MongoCollection<?>) result;
+				final MongoNamespace namespace = collection.getNamespace();
+				final String name;
+				if (namespace != null) {
+					name = namespace.getFullName();
+				} else {
+					name = (String) args[0];
+				}
+				result = createCollectionProxy(collection, name);
 			} else if (result instanceof MongoDatabase) {
 				// il faut monitorer la nouvelle instance de MongoDatabase en retour
 				result = createDatabaseProxy((MongoDatabase) result);
@@ -121,7 +130,14 @@ public final class MongoWrapper {
 				// inutile de monitorer withDocumentClass(...), etc
 				// mais il faut monitorer la nouvelle instance de MongoCollection en retour
 				MongoCollection<?> result = (MongoCollection<?>) method.invoke(collection, args);
-				result = createCollectionProxy(collection, methodName);
+				final MongoNamespace namespace = collection.getNamespace();
+				final String name;
+				if (namespace != null) {
+					name = namespace.getFullName();
+				} else {
+					name = methodName;
+				}
+				result = createCollectionProxy(result, name);
 				return result;
 			} else if (methodName.startsWith("get")) {
 				// inutile de monitorer getDocumentClass(), getNamespace(), etc

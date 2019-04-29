@@ -17,6 +17,9 @@
  */
 package net.bull.javamelody;
 
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.EventListener;
 import java.util.HashSet;
@@ -26,12 +29,16 @@ import java.util.Map.Entry;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.sql.DataSource;
 
+import org.aopalliance.intercept.MethodInvocation;
 import org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator;
 import org.springframework.aop.support.Pointcuts;
 import org.springframework.aop.support.annotation.AnnotationMatchingPointcut;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -45,6 +52,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
@@ -66,7 +74,7 @@ import org.springframework.web.client.RestTemplate;
  * setting the application configuration "javamelody.enabled" to the value "false".
  * </p>
  *
- * @author Georg Wittberger
+ * @author Georg Wittberger, Emeric Vernat
  * @since 1.64.0
  */
 @Configuration
@@ -111,7 +119,20 @@ public class JavaMelodyAutoConfiguration {
 		final FilterRegistrationBean<MonitoringFilter> registrationBean = new FilterRegistrationBean<>();
 
 		// Create the monitoring filter and set its configuration parameters.
-		final MonitoringFilter filter = new MonitoringFilter();
+		final MonitoringFilter filter;
+		if (properties.isManagementEndpointMonitoringEnabled()) {
+			// if the management endpoint is enabled, disable the /monitoring reports on the application port
+			filter = new MonitoringFilter() {
+				@Override
+				protected boolean isAllowed(HttpServletRequest request,
+						HttpServletResponse response) throws IOException {
+					response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden access");
+					return false;
+				}
+			};
+		} else {
+			filter = new MonitoringFilter();
+		}
 		filter.setApplicationType("Spring Boot");
 
 		// Wrap the monitoring filter in the registration bean.
@@ -143,11 +164,23 @@ public class JavaMelodyAutoConfiguration {
 	}
 
 	/**
+	 * When enabled, management endpoint for /monitoring reports on the management http port instead of the application http port.
+	 * @param servletContext ServletContext
+	 * @return MonitoringEndpoint
+	 */
+	@Bean
+	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "management-endpoint-monitoring-enabled", matchIfMissing = false)
+	public MonitoringEndpoint monitoringEndpoint(final ServletContext servletContext) {
+		return new MonitoringEndpoint(servletContext);
+	}
+
+	/**
+	 * Now disabled by default, since dependency spring-boot-starter-aop was added in 1.76.
 	 * @return DefaultAdvisorAutoProxyCreator
 	 */
 	@Bean
 	@ConditionalOnMissingBean(DefaultAdvisorAutoProxyCreator.class)
-	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "advisor-auto-proxy-creator-enabled", matchIfMissing = true)
+	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "advisor-auto-proxy-creator-enabled", matchIfMissing = false)
 	public DefaultAdvisorAutoProxyCreator defaultAdvisorAutoProxyCreator() {
 		return new DefaultAdvisorAutoProxyCreator();
 	}
@@ -223,18 +256,69 @@ public class JavaMelodyAutoConfiguration {
 	}
 
 	/**
-	 * Monitoring of beans methods having the {@link Scheduled} or {@link Schedules} annotations,
-	 * only if <code>scheduled-monitoring-enabled: true</code> is added in application.yml.
+	 * Monitoring of beans methods having the {@link Scheduled} or {@link Schedules} annotations.
 	 * @return MonitoringSpringAdvisor
 	 */
 	@Bean
-	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "scheduled-monitoring-enabled", matchIfMissing = false)
+	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "scheduled-monitoring-enabled", matchIfMissing = true)
+	@ConditionalOnMissingBean(DefaultAdvisorAutoProxyCreator.class)
 	public MonitoringSpringAdvisor monitoringSpringScheduledAdvisor() {
-		// only if scheduled-monitoring-enabled because of #643,
-		// but https://jira.spring.io/browse/SPR-15562 may change that
+		// scheduled-monitoring-enabled was false by default because of #643,
+		// pending https://jira.spring.io/browse/SPR-15562,
+		// but true by default since 1.76 after adding dependency spring-boot-starter-aop
 		return new MonitoringSpringAdvisor(
 				Pointcuts.union(new AnnotationMatchingPointcut(null, Scheduled.class),
 						new AnnotationMatchingPointcut(null, Schedules.class)));
+	}
+
+	/**
+	 * Monitoring of Feign clients.
+	 * @return MonitoringSpringAdvisor
+	 * @throws ClassNotFoundException should not happen
+	 */
+	@SuppressWarnings("unchecked")
+	@Bean
+	@ConditionalOnClass(name = "org.springframework.cloud.openfeign.FeignClient")
+	@ConditionalOnProperty(prefix = JavaMelodyConfigurationProperties.PREFIX, name = "spring-monitoring-enabled", matchIfMissing = true)
+	// we check that the DefaultAdvisorAutoProxyCreator above is not enabled, because if it's enabled then feign calls are counted twice
+	@ConditionalOnMissingBean(DefaultAdvisorAutoProxyCreator.class)
+	public MonitoringSpringAdvisor monitoringFeignClientAdvisor() throws ClassNotFoundException {
+		final Class<? extends Annotation> feignClientClass = (Class<? extends Annotation>) Class
+				.forName("org.springframework.cloud.openfeign.FeignClient");
+		final MonitoringSpringAdvisor advisor = new MonitoringSpringAdvisor(
+				new AnnotationMatchingPointcut(feignClientClass, true));
+		advisor.setAdvice(new MonitoringSpringInterceptor() {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			protected String getRequestName(MethodInvocation invocation) {
+				final StringBuilder sb = new StringBuilder();
+				final Method method = invocation.getMethod();
+				final RequestMapping requestMapping = method.getAnnotation(RequestMapping.class);
+				if (requestMapping != null) {
+					String[] path = requestMapping.value();
+					if (path.length == 0) {
+						path = requestMapping.path();
+					}
+					if (path.length > 0) {
+						sb.append(path[0]);
+						sb.append(' ');
+						if (requestMapping.method().length > 0) {
+							sb.append(requestMapping.method()[0].name());
+						} else {
+							sb.append("GET");
+						}
+						sb.append('\n');
+					}
+				}
+				final Class<?> declaringClass = method.getDeclaringClass();
+				final String classPart = declaringClass.getSimpleName();
+				final String methodPart = method.getName();
+				sb.append(classPart).append('.').append(methodPart);
+				return sb.toString();
+			}
+		});
+		return advisor;
 	}
 
 	/**

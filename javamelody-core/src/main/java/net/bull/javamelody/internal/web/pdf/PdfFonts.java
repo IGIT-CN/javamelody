@@ -18,6 +18,7 @@
 package net.bull.javamelody.internal.web.pdf;
 
 import java.awt.Color;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -30,6 +31,8 @@ import com.lowagie.text.FontFactory;
 import com.lowagie.text.pdf.BaseFont;
 
 import net.bull.javamelody.internal.common.I18N;
+import net.bull.javamelody.internal.common.InputOutput;
+import net.bull.javamelody.internal.common.Parameters;
 
 /**
  * Enumération des fontes pour les documents pdf.
@@ -47,6 +50,8 @@ enum PdfFonts {
 	SEVERE_CELL(getFont(5.5f, Font.BOLD)),
 	TABLE_HEADER(getFont(5.5f, Font.BOLD));
 
+	private static final String UKRAINIAN_LANGUAGE = "uk";
+
 	static {
 		BLUE.font.setColor(Color.BLUE);
 		INFO_CELL.font.setColor(Color.GREEN);
@@ -54,17 +59,22 @@ enum PdfFonts {
 		SEVERE_CELL.font.setColor(Color.RED);
 	}
 
+	private static BaseFont chineseBaseFont;
+	private static BaseFont dejaVuSansBaseFont;
 	private final transient Font font;
 	private transient Font chineseFont;
+	private transient Font dejaVuSansFont;
 
 	PdfFonts(Font font) {
 		this.font = font;
 	}
 
 	Font getFont() {
-		if (Locale.CHINESE.getLanguage()
-				.equals(I18N.getResourceBundle().getLocale().getLanguage())) {
+		final String language = I18N.getResourceBundle().getLocale().getLanguage();
+		if (Locale.CHINESE.getLanguage().equals(language)) {
 			return getChineseFont();
+		} else if (UKRAINIAN_LANGUAGE.equals(language)) {
+			return getDejaVuSansFont();
 		}
 		return font;
 	}
@@ -75,25 +85,31 @@ enum PdfFonts {
 
 	private Font getChineseFont() {
 		if (chineseFont == null) {
+			final BaseFont bfChinese = getChineseBaseFont();
+			chineseFont = new Font(bfChinese, font.getSize(), font.getStyle());
+		}
+		return chineseFont;
+	}
+
+	private static synchronized BaseFont getChineseBaseFont() {
+		if (chineseBaseFont == null) {
 			try {
-				BaseFont bfChinese;
 				try {
-					bfChinese = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H",
+					chineseBaseFont = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H",
 							BaseFont.NOT_EMBEDDED);
 				} catch (final DocumentException e) {
 					// now CJKFont.propertiesLoaded==true, load properties renamed (cf issue 258)
 					loadCJKFonts();
-					bfChinese = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H",
+					chineseBaseFont = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H",
 							BaseFont.NOT_EMBEDDED);
 				}
-				chineseFont = new Font(bfChinese, font.getSize(), font.getStyle());
 			} catch (final DocumentException e) {
 				throw new IllegalStateException(e);
 			} catch (final IOException e) {
 				throw new IllegalStateException(e);
 			}
 		}
-		return chineseFont;
+		return chineseBaseFont;
 	}
 
 	/**
@@ -133,5 +149,43 @@ enum PdfFonts {
 		} catch (final Exception e) {
 			throw new IllegalStateException(e);
 		}
+	}
+
+	private Font getDejaVuSansFont() {
+		if (dejaVuSansFont == null) {
+			final BaseFont bfDejaVuSans = getDejaVuSansBaseFont();
+			dejaVuSansFont = new Font(bfDejaVuSans, font.getSize(), font.getStyle());
+		}
+		return dejaVuSansFont;
+	}
+
+	private static synchronized BaseFont getDejaVuSansBaseFont() {
+		if (dejaVuSansBaseFont == null) {
+			final InputStream input = PdfFonts.class.getResourceAsStream("/DejaVuSans-Bold.ttf");
+			// input may be null if the jrobin jar file is not the 1.5.9 from Maven central or ...
+			if (input != null) {
+				try {
+					try {
+						final File file = new File(Parameters.TEMPORARY_DIRECTORY,
+								"javamelody-ukrainian.ttf");
+						InputOutput.pumpToFile(input, file);
+						dejaVuSansBaseFont = BaseFont.createFont(file.getPath(),
+								BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+					} finally {
+						input.close();
+					}
+				} catch (final IOException e) {
+					throw new IllegalStateException(e);
+				} catch (final DocumentException e) {
+					throw new IllegalStateException(e);
+				}
+			}
+		}
+		return dejaVuSansBaseFont;
+	}
+
+	static boolean shouldUseEnglishInsteadOfUkrainian() {
+		return UKRAINIAN_LANGUAGE.equals(I18N.getResourceBundle().getLocale().getLanguage())
+				&& getDejaVuSansBaseFont() == null;
 	}
 }

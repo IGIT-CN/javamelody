@@ -12,7 +12,7 @@
 
 	<groupId>net.bull.javamelody</groupId>
 	<artifactId>javamelody-for-spring-boot</artifactId>
-	<version>1.76.0-SNAPSHOT</version>
+	<version>1.78.0-SNAPSHOT</version>
 	<packaging>war</packaging>
 
 	<name>JavaMelody - Spring Boot Example</name>
@@ -36,21 +36,6 @@
 			<version>${javamelody.version}</version>
 		</dependency>
 
-		<!--  Note: if you have auto-proxy issues, you can add the following dependency
-		and also javamelody: advisor-auto-proxy-creator-enabled: false in application.yml
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-aop</artifactId>
-		</dependency>
-		
-		or
-		
-		<dependency>
-			<groupId>org.aspectj</groupId>
-			<artifactId>aspectjweaver</artifactId>
-		</dependency> 
-		-->
- 
 		<!-- Optional: iText dependency for PDF exports in JavaMelody -->
 		<dependency>
 			<groupId>com.lowagie</groupId>

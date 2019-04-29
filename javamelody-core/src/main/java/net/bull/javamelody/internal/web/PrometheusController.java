@@ -138,7 +138,7 @@ import net.bull.javamelody.internal.model.TomcatInformations;
  *  javamelody_log_errors_count
  *  javamelody_log_duration_millis
  *  </pre>
- *  Additionally, the `lastValue` metrics can also be exported by setting the parameter PROMETHEUS_INCLUDE_LAST_VALUE=true.
+ *  Additionally, the `lastValue` metrics can also be exported by adding the http parameter includeLastValue=true.
  *  Note: the `lastValue` metrics are already aggregated over time, where Prometheus prefers the raw counters and gauges.
  *  Also, obtaining the `lastValue` metrics appears to have a 5-10ms overhead.
  *
@@ -193,7 +193,11 @@ class PrometheusController {
 		this.out = out;
 
 		decimalFormat = new DecimalFormat();
-		decimalFormat.setDecimalFormatSymbols(DecimalFormatSymbols.getInstance(Locale.US));
+		final DecimalFormatSymbols decimalFormatSymbols = DecimalFormatSymbols
+				.getInstance(Locale.US);
+		// setNaN for #806: on Java 8 and before, decimalFormat prints \uFFFD ('<?>') instead of NaN
+		decimalFormatSymbols.setNaN("NaN");
+		decimalFormat.setDecimalFormatSymbols(decimalFormatSymbols);
 		decimalFormat.setGroupingUsed(false);
 		decimalFormat.setMinimumIntegerDigits(1);
 		decimalFormat.setMaximumFractionDigits(15);
@@ -348,6 +352,9 @@ class PrometheusController {
 	 */
 	private void reportOnCollector() {
 		for (final Counter counter : collector.getCounters()) {
+			if (!counter.isDisplayed()) {
+				continue;
+			}
 			final List<CounterRequest> requests = counter.getRequests();
 			long hits = 0;
 			long duration = 0;
@@ -361,10 +368,16 @@ class PrometheusController {
 			final String sanitizedName = sanitizeName(counter.getName());
 			printLong(MetricType.COUNTER, sanitizedName + "_hits_count", "javamelody counter",
 					hits);
-			printLong(MetricType.COUNTER, sanitizedName + "_errors_count", "javamelody counter",
-					errors);
-			printLong(MetricType.COUNTER, sanitizedName + "_duration_millis", "javamelody counter",
-					duration);
+			if (!counter.isErrorCounter() || counter.isJobCounter()) {
+				// errors has no sense for the error and log counters
+				printLong(MetricType.COUNTER, sanitizedName + "_errors_count", "javamelody counter",
+						errors);
+			}
+			if (duration >= 0) {
+				// duration is negative and has no sense for the log counter
+				printLong(MetricType.COUNTER, sanitizedName + "_duration_millis",
+						"javamelody counter", duration);
+			}
 		}
 	}
 

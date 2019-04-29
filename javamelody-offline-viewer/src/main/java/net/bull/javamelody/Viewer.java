@@ -43,9 +43,10 @@ public class Viewer {
 		parameters.put(Parameter.APPLICATION_NAME, tmpApplication);
 
 		// start the embedded http server with javamelody
-		String url = "http://localhost:8080/";
+		final String port = System.getProperty("javamelody.viewer.port", "8080");
+		String url = "http://localhost:" + port + '/';
 		System.out.println("Starting on " + url);
-		EmbeddedServer.start(8080, parameters);
+		EmbeddedServer.start(Integer.parseInt(port), parameters);
 
 		// open the reports in a browser
 		final String lastDay = new SimpleDateFormat("yyyy-MM-dd")

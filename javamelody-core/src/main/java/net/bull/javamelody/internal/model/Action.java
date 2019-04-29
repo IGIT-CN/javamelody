@@ -217,9 +217,19 @@ public enum Action {
 						heapDump.getName() + ".zip");
 				InputOutput.zipFile(heapDump, zipFile);
 				InputOutput.deleteFile(heapDump);
+				String message = "";
+				if (Parameter.HEAP_DUMP_S3_BUCKETNAME.getValue() != null) {
+					try {
+						S3.upload(zipFile, Parameter.HEAP_DUMP_S3_BUCKETNAME.getValue());
+						message = I18N.getFormattedString("heap_dump_uploaded_to_s3",
+								zipFile.getName()) + ' ';
+					} catch (final IOException e) {
+						message = "Failed to upload heap dump to S3 - " + e.getMessage() + '\n';
+					}
+				}
 				final String path = zipFile.getPath();
-				messageForReport = I18N.getFormattedString("heap_dump_genere",
-						path.replace('\\', '/'));
+				messageForReport = message
+						+ I18N.getFormattedString("heap_dump_genere", path.replace('\\', '/'));
 			}
 			break;
 		case INVALIDATE_SESSIONS:
