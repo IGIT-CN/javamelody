@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -26,6 +26,8 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -97,13 +99,25 @@ public class CollectorController { // NOPMD
 					"applications should be added or removed in the applications.properties file, because the user is not allowed to write: "
 							+ file);
 		}
-		final List<URL> urls = Parameters.parseUrl(appUrls);
+		final List<URL> urls = Parameters.parseUrls(appUrls);
 		collectorServer.addCollectorApplication(appName, urls);
+	}
+
+	public void addCollectorAggregationApplication(String aggregationApplication,
+			List<String> aggregatedApplications) throws IOException {
+		final File file = Parameters.getCollectorApplicationsFile();
+		if (file.exists() && !file.canWrite()) {
+			throw new IllegalStateException(
+					"applications should be added or removed in the applications.properties file, because the user is not allowed to write: "
+							+ file);
+		}
+		collectorServer.addCollectorAggregationApplication(aggregationApplication,
+				aggregatedApplications);
 	}
 
 	public void removeCollectorApplicationNodes(String appName, String nodeUrls)
 			throws IOException {
-		final List<URL> urls = Parameters.parseUrl(nodeUrls);
+		final List<URL> urls = Parameters.parseUrls(nodeUrls);
 		collectorServer.removeCollectorApplicationNodes(appName, urls);
 	}
 
@@ -143,11 +157,11 @@ public class CollectorController { // NOPMD
 					final SerializableController serializableController = new SerializableController(
 							collector);
 					final Range range = serializableController.getRangeForSerializable(req);
-					final List<Object> serializable = new ArrayList<Object>();
 					final List<JavaInformations> javaInformationsList = getJavaInformationsByApplication(
 							application);
-					serializable.addAll((List<?>) serializableController.createDefaultSerializable(
-							javaInformationsList, range, messageForReport));
+					final List<Object> serializable = new ArrayList<Object>(
+							(List<?>) serializableController.createDefaultSerializable(
+									javaInformationsList, range, messageForReport));
 					monitoringController.doCompressedSerializable(req, resp,
 							(Serializable) serializable);
 				} else {
@@ -237,6 +251,12 @@ public class CollectorController { // NOPMD
 			final String cacheId = HttpParameter.CACHE_ID.getParameterFrom(req);
 			doMultiHtmlProxy(req, resp, application,
 					HttpPart.CACHE_KEYS.toString() + '&' + HttpParameter.CACHE_ID + '=' + cacheId,
+					I18N.getFormattedString("Keys_cache", cacheId), null, "caches.png");
+		} else if (HttpPart.JCACHE_KEYS.isPart(req)) {
+			// note: cache keys may not be serializable, so we do not try to serialize them
+			final String cacheId = HttpParameter.CACHE_ID.getParameterFrom(req);
+			doMultiHtmlProxy(req, resp, application,
+					HttpPart.JCACHE_KEYS.toString() + '&' + HttpParameter.CACHE_ID + '=' + cacheId,
 					I18N.getFormattedString("Keys_cache", cacheId), null, "caches.png");
 		} else {
 			final List<JavaInformations> javaInformationsList = getJavaInformationsByApplication(
@@ -496,7 +516,8 @@ public class CollectorController { // NOPMD
 		final PrintWriter writer = createWriterFromOutputStream(resp);
 		writer.write("<html lang='" + I18N.getCurrentLocale().getLanguage()
 				+ "'><head><title>Monitoring</title></head><body>");
-		HtmlReport.writeAddAndRemoveApplicationLinks(null, writer);
+		final Collection<String> applications = Collections.emptyList();
+		HtmlReport.writeAddAndRemoveApplicationLinks(null, applications, writer);
 		writer.write("</body></html>");
 		writer.close();
 	}
@@ -604,7 +625,7 @@ public class CollectorController { // NOPMD
 			// En Tomcat, le cookie doit être conforme à la RFC 6265 (pas d'espace, ...)
 			// see org.apache.tomcat.util.http.Rfc6265CookieProcessor
 			httpCookieManager.addCookie(req, resp, COOKIE_NAME,
-					URLEncoder.encode(String.valueOf(application), "UTF-8"));
+					URLEncoder.encode(application, "UTF-8"));
 		}
 		return application;
 	}
@@ -617,7 +638,7 @@ public class CollectorController { // NOPMD
 		return collectorServer.getJavaInformationsByApplication(application);
 	}
 
-	private static List<URL> getUrlsByApplication(String application) throws IOException {
-		return CollectorServer.getUrlsByApplication(application);
+	private List<URL> getUrlsByApplication(String application) {
+		return collectorServer.getUrlsByApplication(application);
 	}
 }

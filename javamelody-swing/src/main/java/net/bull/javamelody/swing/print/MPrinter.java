@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -240,7 +240,7 @@ public abstract class MPrinter {
 	public void print(final MBasicTable table) throws IOException {
 		final File file = getFile(table);
 		if (file != null) {
-			try (OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(file))) {
+			try (final OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(file))) {
 				print(table, outputStream);
 			}
 

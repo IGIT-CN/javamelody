@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -79,7 +79,7 @@ class FileTransferable extends ArrayList<File> implements Transferable {
 			final File tmpFile = get(0);
 			if (!tmpFile.exists()) {
 				try {
-					try (OutputStream output = new BufferedOutputStream(
+					try (final OutputStream output = new BufferedOutputStream(
 							new FileOutputStream(tmpFile))) {
 						output.write(data);
 					}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -76,7 +76,7 @@ enum JpaMethod {
 				return type;
 			}
 		}
-		return JpaMethod.OTHER;
+		return OTHER;
 	}
 
 	boolean isMonitored() {

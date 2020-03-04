@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -67,7 +67,7 @@ public final class RumInjector implements HtmlToInject {
 		assert lastIndexOfSpace != -1;
 		String tmp = requestName.substring(0, lastIndexOfSpace);
 		// replace each subpath by ".."
-		while (tmp.indexOf("//") != -1) {
+		while (tmp.contains("//")) {
 			tmp = tmp.replaceAll("//", "/");
 		}
 		tmp = tmp.replaceAll("/[^/]*", "/..");

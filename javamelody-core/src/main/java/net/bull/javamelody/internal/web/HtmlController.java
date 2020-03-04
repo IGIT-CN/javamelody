@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -43,6 +43,7 @@ import net.bull.javamelody.internal.model.Collector;
 import net.bull.javamelody.internal.model.CollectorServer;
 import net.bull.javamelody.internal.model.DatabaseInformations;
 import net.bull.javamelody.internal.model.HeapHistogram;
+import net.bull.javamelody.internal.model.JCacheInformations;
 import net.bull.javamelody.internal.model.JavaInformations;
 import net.bull.javamelody.internal.model.JndiBinding;
 import net.bull.javamelody.internal.model.MBeanNode;
@@ -127,7 +128,13 @@ public class HtmlController {
 		} else if (!"ALLOWALL".equals(X_FRAME_OPTIONS)) {
 			httpResponse.setHeader("X-Frame-Options", X_FRAME_OPTIONS);
 		}
-		return new BufferedWriter(new OutputStreamWriter(httpResponse.getOutputStream(), "UTF-8"));
+		try {
+			return new BufferedWriter(
+					new OutputStreamWriter(httpResponse.getOutputStream(), "UTF-8"));
+		} catch (final IllegalStateException e) {
+			// just in case, if httpResponse.getWriter() was already called (for an exception in PrometheusController for example)
+			return new BufferedWriter(httpResponse.getWriter());
+		}
 	}
 
 	@RequestPart(HttpPart.GRAPH)
@@ -335,6 +342,19 @@ public class HtmlController {
 		final String cacheKeysPart = HttpPart.CACHE_KEYS.toString() + '&' + HttpParameter.CACHE_ID
 				+ '=' + I18N.urlEncode(cacheId);
 		htmlReport.writeCacheWithKeys(cacheId, cacheInfo, messageForReport, cacheKeysPart,
+				withoutHeaders);
+	}
+
+	@RequestPart(HttpPart.JCACHE_KEYS)
+	void doJCacheKeys(@RequestParameter(HttpParameter.CACHE_ID) String cacheId,
+			@RequestParameter(HttpParameter.FORMAT) String format) throws IOException {
+		assert !isFromCollectorServer();
+		final JCacheInformations cacheInfo = JCacheInformations
+				.buildJCacheInformationsWithKeys(cacheId);
+		final boolean withoutHeaders = HTML_BODY_FORMAT.equalsIgnoreCase(format);
+		final String jcacheKeysPart = HttpPart.JCACHE_KEYS.toString() + '&' + HttpParameter.CACHE_ID
+				+ '=' + I18N.urlEncode(cacheId);
+		htmlReport.writeJCacheWithKeys(cacheId, cacheInfo, messageForReport, jcacheKeysPart,
 				withoutHeaders);
 	}
 

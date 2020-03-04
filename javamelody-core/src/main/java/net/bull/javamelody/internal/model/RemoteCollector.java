@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import net.bull.javamelody.SessionListener;
+import net.bull.javamelody.internal.common.Parameters;
 import net.bull.javamelody.internal.model.SamplingProfiler.SampledMethod;
 
 /**
@@ -42,6 +43,10 @@ public class RemoteCollector {
 	private Collector collector;
 	private List<JavaInformations> javaInformationsList;
 	private Map<JavaInformations, List<CounterRequestContext>> currentRequests;
+	private final List<Counter> newCounters = new ArrayList<Counter>();
+	private List<RemoteCollector> remoteCollectors;
+	private final boolean aggregatedApplication;
+	private final boolean aggregationApplication;
 	private String cookies;
 	private boolean aggregationDisabled;
 
@@ -49,24 +54,26 @@ public class RemoteCollector {
 	 * Constructeur.
 	 * @param application Nom de l'application
 	 * @param urls URLs
+	 * @throws IOException e
 	 */
-	public RemoteCollector(String application, List<URL> urls) {
+	public RemoteCollector(String application, List<URL> urls) throws IOException {
 		super();
 		assert application != null;
 		assert urls != null;
 		this.application = application;
 		this.urls = urls;
+		this.aggregatedApplication = isAggregatedApplication();
+		this.aggregationApplication = isAggregationApplication();
 	}
 
 	String collectData() throws IOException {
-		return collectDataWithUrls(urls);
+		return collectDataWithUrls(getURLs());
 	}
 
 	public String collectDataIncludingCurrentRequests() throws IOException {
 		final List<URL> urlsWithCurrentRequests = new ArrayList<URL>();
-		for (final URL url : urls) {
-			urlsWithCurrentRequests
-					.add(new URL(url.toString() + "&part=defaultWithCurrentRequests"));
+		for (final URL url : getURLs()) {
+			urlsWithCurrentRequests.add(new URL(url + "&part=defaultWithCurrentRequests"));
 		}
 		return collectDataWithUrls(urlsWithCurrentRequests);
 	}
@@ -76,21 +83,40 @@ public class RemoteCollector {
 		final Map<JavaInformations, List<CounterRequestContext>> counterRequestContextsByJavaInformations = new HashMap<JavaInformations, List<CounterRequestContext>>();
 		final StringBuilder sb = new StringBuilder();
 		IOException exception = null;
-		for (final URL url : urlsForCollect) {
-			try {
-				final List<Counter> counters = new ArrayList<Counter>();
-				final List<Serializable> serialized = createRemoteCall(url).collectData();
-				dispatchSerializables(serialized, counters, javaInfosList,
-						counterRequestContextsByJavaInformations, sb);
-				if (this.collector == null || aggregationDisabled) {
-					this.collector = new Collector(application, counters);
-				} else {
+		if (!aggregationApplication) {
+			for (final URL url : urlsForCollect) {
+				try {
+					final List<Counter> counters = new ArrayList<Counter>();
+					final List<Serializable> serialized = createRemoteCall(url).collectData();
+					dispatchSerializables(serialized, counters, javaInfosList,
+							counterRequestContextsByJavaInformations, sb);
 					addRequestsAndErrors(counters);
+					if (aggregatedApplication) {
+						newCounters.addAll(counters);
+					}
+				} catch (final IOException e) {
+					exception = e;
+					// if a node of the application is no longer reachable, collect data for the others
+					continue;
 				}
-			} catch (final IOException e) {
-				exception = e;
-				// if a node of the application is no longer reachable, collect data for the others
-				continue;
+			}
+		} else {
+			assert remoteCollectors != null;
+			for (final RemoteCollector remoteCollector : remoteCollectors) {
+				javaInfosList.addAll(remoteCollector.getJavaInformationsList());
+				counterRequestContextsByJavaInformations
+						.putAll(remoteCollector.getCurrentRequests());
+				final List<Counter> counters = remoteCollector.getNewCounters();
+				if (counters.isEmpty()) {
+					// lors de la première collecte, il faut récupérer les counters et pas seulement les deltas
+					counters.addAll(remoteCollector.getCollector().getCounters());
+				}
+				addRequestsAndErrors(counters);
+				if (aggregatedApplication) {
+					newCounters.addAll(counters);
+				}
+				// les nouveaux counters ont été aggrégés dans cette application, on peut les oublier
+				counters.clear();
 			}
 		}
 		if (exception != null && javaInfosList.isEmpty()) {
@@ -136,11 +162,25 @@ public class RemoteCollector {
 		}
 	}
 
+	private boolean isAggregatedApplication() throws IOException {
+		for (final List<String> applications : Parameters.getApplicationsByAggregationApplication()
+				.values()) {
+			if (applications.contains(application)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	final boolean isAggregationApplication() throws IOException {
+		return Parameters.getApplicationsByAggregationApplication().containsKey(application);
+	}
+
 	public String executeActionAndCollectData(Action action, String counterName, String sessionId,
 			String threadId, String jobId, String cacheId) throws IOException {
 		assert action != null;
-		final List<URL> actionUrls = new ArrayList<URL>(urls.size());
-		for (final URL url : urls) {
+		final List<URL> actionUrls = new ArrayList<URL>(getURLs().size());
+		for (final URL url : getURLs()) {
 			final URL actionUrl = createRemoteCall(url).getActionUrl(action, counterName, sessionId,
 					threadId, jobId, cacheId);
 			actionUrls.add(actionUrl);
@@ -154,7 +194,7 @@ public class RemoteCollector {
 		if (sessionId == null) {
 			// récupération à la demande des sessions
 			final List<SessionInformations> sessionsInformations = new ArrayList<SessionInformations>();
-			for (final URL url : urls) {
+			for (final URL url : getURLs()) {
 				final List<SessionInformations> sessions = createRemoteCall(url)
 						.collectSessionInformations(null);
 				sessionsInformations.addAll(sessions);
@@ -162,7 +202,7 @@ public class RemoteCollector {
 			SessionListener.sortSessions(sessionsInformations);
 			return sessionsInformations;
 		}
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final List<SessionInformations> sessions = createRemoteCall(url)
 					.collectSessionInformations(sessionId);
 			if (!sessions.isEmpty()) {
@@ -176,9 +216,9 @@ public class RemoteCollector {
 	public List<SampledMethod> collectHotspots() throws IOException {
 		// récupération à la demande des hotspots
 		final Map<SampledMethod, SampledMethod> map = new HashMap<SampledMethod, SampledMethod>();
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final List<SampledMethod> hotspots = createRemoteCall(url).collectHotspots();
-			if (urls.size() == 1) {
+			if (getURLs().size() == 1) {
 				// s'il n'y a qu'un serveur, inutile d'aller plus loin pour fusionner les données
 				return hotspots;
 			}
@@ -200,7 +240,7 @@ public class RemoteCollector {
 	public HeapHistogram collectHeapHistogram() throws IOException {
 		// récupération à la demande des HeapHistogram
 		HeapHistogram heapHistoTotal = null;
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final HeapHistogram heapHisto = createRemoteCall(url).collectHeapHistogram();
 			if (heapHistoTotal == null) {
 				heapHistoTotal = heapHisto;
@@ -212,14 +252,14 @@ public class RemoteCollector {
 	}
 
 	public DatabaseInformations collectDatabaseInformations(int requestIndex) throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectDatabaseInformations(requestIndex);
 	}
 
 	public List<List<ConnectionInformations>> collectConnectionInformations() throws IOException {
 		// récupération à la demande des connections
 		final List<List<ConnectionInformations>> connectionInformations = new ArrayList<List<ConnectionInformations>>();
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final List<List<ConnectionInformations>> connections = createRemoteCall(url)
 					.collectConnectionInformations();
 			connectionInformations.addAll(connections);
@@ -230,7 +270,7 @@ public class RemoteCollector {
 	public Map<String, List<ProcessInformations>> collectProcessInformations() throws IOException {
 		// récupération à la demande des processus
 		final Map<String, List<ProcessInformations>> result = new LinkedHashMap<String, List<ProcessInformations>>();
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final Map<String, List<ProcessInformations>> processesByTitle = createRemoteCall(url)
 					.collectProcessInformations();
 			result.putAll(processesByTitle);
@@ -242,14 +282,14 @@ public class RemoteCollector {
 		// récupération à la demande des bindings JNDI,
 		// contrairement aux requêtes en cours ou aux processus, un serveur de l'application suffira
 		// car l'arbre JNDI est en général identique dans tout l'éventuel cluster
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectJndiBindings(path);
 	}
 
 	public Map<String, List<MBeanNode>> collectMBeans() throws IOException {
 		// récupération à la demande des MBeans
 		final Map<String, List<MBeanNode>> result = new LinkedHashMap<String, List<MBeanNode>>();
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final Map<String, List<MBeanNode>> mbeansByTitle = createRemoteCall(url)
 					.collectMBeans();
 			result.putAll(mbeansByTitle);
@@ -261,12 +301,12 @@ public class RemoteCollector {
 		// récupération à la demande des dépendances,
 		// contrairement aux requêtes en cours ou aux processus, un serveur de l'application suffira
 		// car le résultat est identique dans tout l'éventuel cluster
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectWebappDependencies();
 	}
 
 	public Map<String, Date> collectWebappVersions() throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectWebappVersions();
 	}
 
@@ -274,7 +314,7 @@ public class RemoteCollector {
 			throws IOException {
 		// récupération à la demande des requêtes en cours
 		final Map<JavaInformations, List<CounterRequestContext>> result = new LinkedHashMap<JavaInformations, List<CounterRequestContext>>();
-		for (final URL url : urls) {
+		for (final URL url : getURLs()) {
 			final Map<JavaInformations, List<CounterRequestContext>> requests = createRemoteCall(
 					url).collectCurrentRequests();
 			result.putAll(requests);
@@ -292,31 +332,35 @@ public class RemoteCollector {
 	}
 
 	public Map<String, byte[]> collectJRobins(int width, int height) throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectJRobins(width, height);
 	}
 
 	public Map<String, byte[]> collectOtherJRobins(int width, int height) throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectOtherJRobins(width, height);
 	}
 
 	public byte[] collectJRobin(String graphName, int width, int height) throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectJRobin(graphName, width, height);
 	}
 
 	public String collectSqlRequestExplainPlan(String sqlRequest) throws IOException {
-		final URL url = urls.get(0);
+		final URL url = getURLs().get(0);
 		return createRemoteCall(url).collectSqlRequestExplainPlan(sqlRequest);
 	}
 
 	private void addRequestsAndErrors(List<Counter> counters) {
-		for (final Counter newCounter : counters) {
-			final Counter counter = collector.getCounterByName(newCounter.getName());
-			// counter.isDisplayed() peut changer pour spring, ejb ou services selon l'utilisation
-			counter.setDisplayed(newCounter.isDisplayed());
-			counter.addRequestsAndErrors(newCounter);
+		if (this.collector == null || aggregationDisabled) {
+			this.collector = new Collector(application, counters);
+		} else {
+			for (final Counter newCounter : counters) {
+				final Counter counter = collector.getCounterByName(newCounter.getName());
+				// counter.isDisplayed() peut changer pour spring, ejb ou services selon l'utilisation
+				counter.setDisplayed(newCounter.isDisplayed());
+				counter.addRequestsAndErrors(newCounter);
+			}
 		}
 	}
 
@@ -339,6 +383,13 @@ public class RemoteCollector {
 	}
 
 	public List<URL> getURLs() {
+		if (aggregationApplication) {
+			final List<URL> result = new ArrayList<URL>();
+			for (final RemoteCollector remoteCollector : remoteCollectors) {
+				result.addAll(remoteCollector.getURLs());
+			}
+			return result;
+		}
 		return urls;
 	}
 
@@ -354,9 +405,17 @@ public class RemoteCollector {
 		return currentRequests;
 	}
 
+	List<Counter> getNewCounters() {
+		return newCounters;
+	}
+
+	void setRemoteCollectors(List<RemoteCollector> remoteCollectors) {
+		this.remoteCollectors = remoteCollectors;
+	}
+
 	// cette méthode est utilisée dans l'ihm Swing
 	public void setURLs(List<URL> newURLs) {
-		assert urls != null;
+		assert newURLs != null;
 		this.urls = newURLs;
 	}
 

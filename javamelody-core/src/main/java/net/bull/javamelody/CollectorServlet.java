@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -20,6 +20,7 @@ package net.bull.javamelody;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.StreamCorruptedException;
+import java.util.Arrays;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -144,11 +145,13 @@ public class CollectorServlet extends HttpServlet {
 		final String appName = req.getParameter("appName");
 		final String appUrls = req.getParameter("appUrls");
 		final String action = req.getParameter("action");
+		final String[] aggregatedApps = req.getParameterValues("aggregatedApps");
 		try {
-			if (appName == null || appUrls == null) {
+			if (appName == null || appUrls == null && aggregatedApps == null) {
 				throw new IllegalArgumentException(I18N.getString("donnees_manquantes"));
 			}
-			if (!appUrls.startsWith("http://") && !appUrls.startsWith("https://")) {
+			if (appUrls != null && !appUrls.startsWith("http://")
+					&& !appUrls.startsWith("https://")) {
 				throw new IllegalArgumentException(I18N.getString("urls_format"));
 			}
 			final CollectorController collectorController = new CollectorController(
@@ -156,20 +159,27 @@ public class CollectorServlet extends HttpServlet {
 			if ("unregisterNode".equals(action)) {
 				collectorController.removeCollectorApplicationNodes(appName, appUrls);
 				LOGGER.info("monitored application node removed: " + appName + ", url: " + appUrls);
-			} else {
+			} else if (appUrls != null) {
 				collectorController.addCollectorApplication(appName, appUrls);
 				LOGGER.info("monitored application added: " + appName);
 				LOGGER.info("urls of the monitored application: " + appUrls);
-				CollectorController.showAlertAndRedirectTo(resp,
-						I18N.getFormattedString("application_ajoutee", appName),
-						"?application=" + appName);
+			} else {
+				assert aggregatedApps != null;
+				collectorController.addCollectorAggregationApplication(appName,
+						Arrays.asList(aggregatedApps));
+				LOGGER.info("aggregation application added: " + appName);
+				LOGGER.info("aggregated applications of the aggregation application: "
+						+ Arrays.asList(aggregatedApps));
 			}
+			CollectorController.showAlertAndRedirectTo(resp,
+					I18N.getFormattedString("application_ajoutee", appName),
+					"?application=" + appName);
 		} catch (final FileNotFoundException e) {
 			final String message = I18N.getString("monitoring_configure");
-			throw new IllegalStateException(message + '\n' + e.toString(), e);
+			throw new IllegalStateException(message + '\n' + e, e);
 		} catch (final StreamCorruptedException e) {
 			final String message = I18N.getFormattedString("reponse_non_comprise", appUrls);
-			throw new IllegalStateException(message + '\n' + e.toString(), e);
+			throw new IllegalStateException(message + '\n' + e, e);
 		}
 	}
 
@@ -188,7 +198,7 @@ public class CollectorServlet extends HttpServlet {
 	// addCollectorApplication and removeCollectorApplication added for spring-boot-admin
 	// see https://github.com/codecentric/spring-boot-admin/pull/450
 	public static void addCollectorApplication(String application, String urls) throws IOException {
-		Parameters.addCollectorApplication(application, Parameters.parseUrl(urls));
+		Parameters.addCollectorApplication(application, Parameters.parseUrls(urls));
 	}
 
 	public static void removeCollectorApplication(String application) throws IOException {

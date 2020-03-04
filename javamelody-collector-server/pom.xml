@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>net.bull.javamelody</groupId>
 	<artifactId>javamelody-collector-server</artifactId>
-	<version>1.78.0-SNAPSHOT</version>
+	<version>1.83.0-SNAPSHOT</version>
 	<packaging>war</packaging>
 	<name>JavaMelody - Collector server</name>
 	<description>Optional centralized collector server for Java Melody</description>
@@ -28,9 +28,6 @@
 		<url>https://github.com/javamelody/javamelody</url>
 		<tag>HEAD</tag>
 	</scm>
-	<prerequisites>
-		<maven>3.0.4</maven>
-	</prerequisites>
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
@@ -66,12 +63,17 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.5.11</version>
+			<version>1.7.26</version>
 		</dependency>
 		<dependency>
 			<groupId>com.thoughtworks.xstream</groupId>
 			<artifactId>xstream</artifactId>
-			<version>1.4.10</version>
+			<version>1.4.11.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.8.6</version>
 		</dependency>
 		<!-- AWS CloudWatch dependencies to send metrics to CloudWatch (about 4.5 MB) -->
 		<dependency>
@@ -89,7 +91,7 @@
 		<plugins>
 			<plugin>
 				<artifactId>maven-war-plugin</artifactId>
-				<version>3.0.0</version>
+				<version>3.2.3</version>
 				<configuration>
 					<overlays>
 						<overlay>
@@ -105,17 +107,6 @@
 							</includes>
 						</overlay>
 					</overlays>
-					<webResources>
-						<resource>
-							<directory>../javamelody-core/src/main/collector-webapp</directory>
-						</resource>
-						<resource>
-							<directory>../javamelody-core/src/main/lib</directory>
-							<includes>
-								<include>winstone-jenkins.jar</include>
-							</includes>
-						</resource>
-					</webResources>
 					<archive>
 						<manifestEntries>
 							<Implementation-Title>${project.name}</Implementation-Title>

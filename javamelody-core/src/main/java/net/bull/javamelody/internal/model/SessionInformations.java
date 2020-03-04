@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -45,8 +45,8 @@ import net.bull.javamelody.internal.common.I18N;
 public class SessionInformations implements Serializable {
 	private static final long serialVersionUID = -2689338895804445093L;
 
-	private static final List<String> BROWSERS = Arrays.asList("Edge", "Chrome", "CriOS", "Firefox",
-			"Safari", "MSIE", "Trident", "Opera" // IEMobile dans MSIE
+	private static final List<String> BROWSERS = Arrays.asList("Edge", "Edg", "Chrome", "CriOS",
+			"Firefox", "Safari", "MSIE", "Trident", "Opera" // IEMobile dans MSIE
 	);
 
 	private static final List<String> OS = Arrays.asList(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -247,7 +247,7 @@ public final class MBeans {
 					} else {
 						sb.append(",\n");
 					}
-					sb.append(String.valueOf(value));
+					sb.append(value);
 				}
 				sb.append(']');
 				return sb.toString();

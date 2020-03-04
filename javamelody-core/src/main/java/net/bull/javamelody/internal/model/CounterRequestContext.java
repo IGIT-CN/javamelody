@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -52,6 +52,7 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 	private final long startTime;
 	private final long startCpuTime;
 	private final long startAllocatedBytes;
+	private final String sessionId;
 	// ces 2 champs sont initialisés à 0
 	private int childHits;
 	private int childDurationsSum;
@@ -61,11 +62,11 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 	// CHECKSTYLE:OFF
 	public CounterRequestContext(Counter parentCounter, CounterRequestContext parentContext,
 			String requestName, String completeRequestName, HttpServletRequest httpRequest,
-			String remoteUser, long startCpuTime, long startAllocatedBytes) {
+			String remoteUser, long startCpuTime, long startAllocatedBytes, String sessionId) {
 		// CHECKSTYLE:ON
 		this(parentCounter, parentContext, requestName, completeRequestName, httpRequest,
 				remoteUser, Thread.currentThread().getId(), System.currentTimeMillis(),
-				startCpuTime, startAllocatedBytes);
+				startCpuTime, startAllocatedBytes, sessionId);
 		if (parentContext != null) {
 			parentContext.setCurrentChildContext(this);
 		}
@@ -76,7 +77,7 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 	private CounterRequestContext(Counter parentCounter, CounterRequestContext parentContext, // NOPMD
 			String requestName, String completeRequestName, HttpServletRequest httpRequest,
 			String remoteUser, long threadId, long startTime, long startCpuTime,
-			long startAllocatedBytes) {
+			long startAllocatedBytes, String sessionId) {
 		// CHECKSTYLE:ON
 		super();
 		assert parentCounter != null;
@@ -94,6 +95,7 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 		this.startTime = startTime;
 		this.startCpuTime = startCpuTime;
 		this.startAllocatedBytes = startAllocatedBytes;
+		this.sessionId = sessionId;
 	}
 
 	public Counter getParentCounter() {
@@ -205,8 +207,6 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 		return childDurationsSum;
 	}
 
-	/** {@inheritDoc} */
-	@Override
 	public Map<String, Long> getChildRequestsExecutionsByRequestId() {
 		if (childRequestsExecutionsByRequestId == null) {
 			return Collections.emptyMap();
@@ -274,7 +274,7 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 
 	@SuppressWarnings("unused")
 	void addChildRequest(Counter childCounter, String request, String requestId, long duration,
-			boolean systemError, int responseSize) {
+			boolean systemError, long responseSize) {
 		// si je suis le counter fils du counter du contexte parent
 		// comme sql pour http alors on ajoute la requête fille
 		if (parentContext != null && parentCounter.getName()
@@ -330,7 +330,7 @@ public class CounterRequestContext implements ICounterRequestContext, Cloneable,
 		//				counter.getIconName(), counter.getChildCounterName(), null);
 		final CounterRequestContext clone = new CounterRequestContext(counter, parentContextClone,
 				getRequestName(), getCompleteRequestName(), httpRequest, getRemoteUser(),
-				getThreadId(), startTime, startCpuTime, startAllocatedBytes);
+				getThreadId(), startTime, startCpuTime, startAllocatedBytes, sessionId);
 		clone.childHits = getChildHits();
 		clone.childDurationsSum = getChildDurationsSum();
 		final CounterRequestContext childContext = getCurrentChildContext();

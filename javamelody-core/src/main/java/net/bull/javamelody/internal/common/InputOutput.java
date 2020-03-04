@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -91,5 +91,16 @@ public final class InputOutput {
 
 	public static boolean deleteFile(File file) {
 		return file.delete();
+	}
+
+	public static void copyFile(File source, File target) throws IOException {
+		final FileInputStream in = new FileInputStream(source);
+		final FileOutputStream out = new FileOutputStream(target);
+		try {
+			pump(in, out);
+		} finally {
+			out.close();
+			in.close();
+		}
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -62,7 +62,8 @@ public class DatabaseInformations implements Serializable {
 		HSQLDB("HSQL Database Engine"),
 		SQLSERVER("Microsoft SQL Server"),
 		SYBASE("Sybase SQL Server", "Adaptive Server Enterprise"),
-		INFORMIX("Informix Dynamic Server");
+		INFORMIX("Informix Dynamic Server"),
+		SQLITE("SQLite");
 
 		// RESOURCE_BUNDLE_BASE_NAME vaut "net.bull.javamelody.resource.databaseInformations"
 		// ce qui charge net.bull.javamelody.resource.databaseInformations.properties
@@ -70,7 +71,7 @@ public class DatabaseInformations implements Serializable {
 		private static final String RESOURCE_BUNDLE_BASE_NAME = Parameters
 				.getResourcePath("databaseInformations").replace('/', '.').substring(1);
 
-		private List<String> databaseNames;
+		private final List<String> databaseNames;
 
 		Database(String... databaseNames) {
 			this.databaseNames = Arrays.asList(databaseNames);
@@ -88,7 +89,7 @@ public class DatabaseInformations implements Serializable {
 						"pg_statio_user_sequences", "pg_settings");
 				break;
 			case MYSQL:
-			case MARIADB:			
+			case MARIADB:
 				tmp = Arrays.asList("processlist", "databases", "variables", "global_status",
 						"innodb_status", "unusedIndexes", "longRunning", "tableStats",
 						"eventsWaits", "tableIoWaits", "indexIoWaits", "tableLockWaits",
@@ -130,6 +131,9 @@ public class DatabaseInformations implements Serializable {
 			case INFORMIX:
 				tmp = Arrays.asList("version", "sessions", "resources_by_user", "current_queries",
 						"config");
+				break;
+			case SQLITE:
+				tmp = Arrays.asList("version", "database_list");
 				break;
 			default:
 				throw new IllegalStateException();

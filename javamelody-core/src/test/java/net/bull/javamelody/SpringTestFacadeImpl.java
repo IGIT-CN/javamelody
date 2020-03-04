@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -41,8 +41,7 @@ public class SpringTestFacadeImpl implements SpringTestFacade {
 		//		final javax.sql.DataSource dataSource = (javax.sql.DataSource) new javax.naming.InitialContext()
 		//				.lookup("java:comp/env/jdbc/TestDB");
 		final ConfigurableApplicationContext context = new ClassPathXmlApplicationContext(
-				new String[] { "net/bull/javamelody/monitoring-spring.xml",
-						"spring-context.xml", });
+				"net/bull/javamelody/monitoring-spring.xml", "spring-context.xml");
 		try {
 			final javax.sql.DataSource dataSource = (javax.sql.DataSource) context
 					.getBean("dataSource");

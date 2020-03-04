@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -193,6 +193,10 @@ public class HtmlCacheInformationsReport extends HtmlAbstractReport {
 			write("<br/>#No_keys#");
 			return;
 		}
+		if (cacheKeys.size() > 20) {
+			writeln("<div align='right'>" + cacheKeys.size() + " #Keys#</div>");
+			writeln("<br/>");
+		}
 		final HtmlTable table = new HtmlTable();
 		table.beginTable(getString("Keys"));
 		write("<th>#Keys#</th>");
@@ -234,5 +238,7 @@ public class HtmlCacheInformationsReport extends HtmlAbstractReport {
 			}
 		}
 		table.endTable();
+		writeln("<br/>");
+		writeln("<div align='right'>" + cacheKeys.size() + " #Keys#</div>");
 	}
 }

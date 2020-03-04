@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -55,7 +55,8 @@ public enum HttpPart {
 	SPRING_BEANS("springBeans"),
 	RUM("rum"),
 	WEBAPP_VERSIONS("webappVersions"),
-	CACHE_KEYS("cacheKeys");
+	CACHE_KEYS("cacheKeys"),
+	JCACHE_KEYS("jcacheKeys");
 
 	private final String name;
 

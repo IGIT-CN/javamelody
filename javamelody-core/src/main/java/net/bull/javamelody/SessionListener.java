@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 import javax.servlet.http.HttpSession;
@@ -239,13 +240,11 @@ public class SessionListener implements HttpSessionListener, HttpSessionActivati
 		return Collections.unmodifiableList(sessionsInformations);
 	}
 
-	public static List<SessionInformations> sortSessions(
-			List<SessionInformations> sessionsInformations) {
+	public static void sortSessions(List<SessionInformations> sessionsInformations) {
 		if (sessionsInformations.size() > 1) {
 			Collections.sort(sessionsInformations,
 					Collections.reverseOrder(new SessionInformationsComparator()));
 		}
-		return sessionsInformations;
 	}
 
 	public static SessionInformations getSessionInformationsBySessionId(String sessionId) {
@@ -336,6 +335,12 @@ public class SessionListener implements HttpSessionListener, HttpSessionActivati
 		// issue 665: in WildFly 10.1.0, the MonitoringFilter may never be initialized neither destroyed.
 		// For this case, it is needed to stop here the JdbcWrapper initialized in contextInitialized
 		JdbcWrapper.SINGLETON.stop();
+
+		// issue 878: NPE at net.bull.javamelody.JspWrapper.createHttpRequestWrapper
+		if (event.getServletContext().getClass().getName().startsWith("io.undertow")) {
+			// issue 848: NPE after SpringBoot hot restart
+			Parameters.initialize((ServletContext) null);
+		}
 
 		LOG.debug("JavaMelody listener destroy done");
 	}

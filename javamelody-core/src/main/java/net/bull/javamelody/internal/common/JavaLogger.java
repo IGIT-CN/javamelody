@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -64,10 +64,11 @@ class JavaLogger implements JavaMelodyLogger {
 	/** {@inheritDoc} */
 	@Override
 	public void logHttpRequest(HttpServletRequest httpRequest, String requestName, long duration,
-			boolean systemError, int responseSize, String loggerName) {
+			boolean systemError, int responseStatus, long responseSize, String loggerName) {
 		final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(loggerName);
 		if (logger.isLoggable(Level.INFO)) {
-			logger.info(LOG.buildLogMessage(httpRequest, duration, systemError, responseSize));
+			logger.info(LOG.buildLogMessage(httpRequest, duration, systemError, responseStatus,
+					responseSize));
 		}
 	}
 }

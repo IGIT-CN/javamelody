@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -278,7 +278,7 @@ class MainButtonsPanel extends MelodyPanel {
 				PdfCoreReport.SMALL_GRAPH_WIDTH, PdfCoreReport.SMALL_GRAPH_HEIGHT);
 		final Map<String, byte[]> largeGraphs = remoteCollector
 				.collectJRobins(PdfCoreReport.LARGE_GRAPH_WIDTH, PdfCoreReport.LARGE_GRAPH_HEIGHT);
-		try (OutputStream output = createFileOutputStream(tempFile)) {
+		try (final OutputStream output = createFileOutputStream(tempFile)) {
 			final PdfReport pdfReport = new PdfReport(collector, collectorServer,
 					javaInformationsList, range, output);
 			try {

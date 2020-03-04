@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -28,7 +28,6 @@ import java.nio.charset.Charset;
 import java.security.CodeSource;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
 import net.bull.javamelody.internal.common.HttpPart;
@@ -55,7 +54,7 @@ class HtmlSourceReport extends HtmlAbstractReport {
 		}
 		if (temp.lastIndexOf('/') != -1) {
 			// for JDK 9+
-			temp = temp.substring(temp.lastIndexOf('/') + 1, temp.length());
+			temp = temp.substring(temp.lastIndexOf('/') + 1);
 		}
 		return temp;
 	}
@@ -100,8 +99,7 @@ class HtmlSourceReport extends HtmlAbstractReport {
 		return null;
 	}
 
-	private String getSourceFromJar(Class<?> clazz, File srcJarFile)
-			throws ZipException, IOException {
+	private String getSourceFromJar(Class<?> clazz, File srcJarFile) throws IOException {
 		final ZipFile zipFile = new ZipFile(srcJarFile);
 		try {
 			final String entryName = clazz.getName().replace('.', '/') + ".java";
@@ -172,6 +170,11 @@ class HtmlSourceReport extends HtmlAbstractReport {
 			}
 		}
 		return htmlEncodeButNotSpace(element);
+	}
+
+	static String htmlEncodeStackTraceElementAndTabs(String element) {
+		return htmlEncodeStackTraceElement(element).replaceAll("\t",
+				"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
 	}
 
 	static String addLinkToClassName(String className) {

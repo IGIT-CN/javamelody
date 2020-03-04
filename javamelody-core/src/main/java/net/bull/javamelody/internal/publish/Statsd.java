@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -72,7 +72,7 @@ class Statsd extends MetricsPublisher {
 			if (index != -1) {
 				// we could use new URI("socket://" + statsdAddress).getHost() and getPort() to parse the address
 				address = statsdAddress.substring(0, index);
-				port = Integer.parseInt(statsdAddress.substring(index + 1, statsdAddress.length()));
+				port = Integer.parseInt(statsdAddress.substring(index + 1));
 			} else {
 				address = statsdAddress;
 				port = DEFAULT_STATSD_PORT;

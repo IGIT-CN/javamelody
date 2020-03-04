@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -33,6 +33,7 @@ import net.bull.javamelody.internal.model.CacheInformations;
 import net.bull.javamelody.internal.model.Collector;
 import net.bull.javamelody.internal.model.Counter;
 import net.bull.javamelody.internal.model.CounterRequest;
+import net.bull.javamelody.internal.model.JCacheInformations;
 import net.bull.javamelody.internal.model.JRobin;
 import net.bull.javamelody.internal.model.JavaInformations;
 import net.bull.javamelody.internal.model.MemoryInformations;
@@ -184,9 +185,11 @@ class PrometheusController {
 		assert out != null;
 		// it doesn't make much sense to use a JavaMelody collector server with Prometheus
 		// (which is effectively it's own collector server)
+		// and at least not for several nodes in a single application
 		if (javaInformations.size() > 1) {
 			throw new IOException(
-					"JavaMelody collector server not supported - configure Prometheus to scrape nodes.");
+					"Prometheus from collector server is not supported for several nodes in one application"
+							+ " - configure Prometheus to scrape nodes directly or declare several applications in the collector server.");
 		}
 		this.javaInformations = javaInformations.get(0);
 		this.collector = collector;
@@ -224,6 +227,9 @@ class PrometheusController {
 		// caches
 		if (javaInformations.isCacheEnabled()) {
 			reportOnCacheInformations();
+		}
+		if (javaInformations.isJCacheEnabled()) {
+			reportOnJCacheInformations();
 		}
 
 		reportOnCollector();
@@ -283,6 +289,32 @@ class PrometheusController {
 		printHeader(MetricType.COUNTER, "cache_misses_count", "total cache misses count");
 		for (final Map.Entry<String, CacheInformations> entry : cacheInfos.entrySet()) {
 			printLongWithFields("cache_misses_count", entry.getKey(),
+					entry.getValue().getCacheMisses());
+		}
+	}
+
+	private void reportOnJCacheInformations() { // NOPMD
+		final List<JCacheInformations> jcacheInformationsList = javaInformations
+				.getJCacheInformationsList();
+		final Map<String, JCacheInformations> cacheInfos = new LinkedHashMap<String, JCacheInformations>(
+				jcacheInformationsList.size());
+		for (final JCacheInformations cacheInfo : jcacheInformationsList) {
+			final String fields = "{cache_name=\"" + sanitizeName(cacheInfo.getName()) + "\"}";
+			cacheInfos.put(fields, cacheInfo);
+		}
+		printHeader(MetricType.GAUGE, "jcache_hits_pct", "cache hits percent");
+		for (final Map.Entry<String, JCacheInformations> entry : cacheInfos.entrySet()) {
+			printDoubleWithFields("jcache_hits_pct", entry.getKey(),
+					(double) entry.getValue().getHitsRatio() / 100);
+		}
+		printHeader(MetricType.COUNTER, "jcache_hits_count", "total cache hit count");
+		for (final Map.Entry<String, JCacheInformations> entry : cacheInfos.entrySet()) {
+			printLongWithFields("jcache_hits_count", entry.getKey(),
+					entry.getValue().getCacheHits());
+		}
+		printHeader(MetricType.COUNTER, "jcache_misses_count", "total cache misses count");
+		for (final Map.Entry<String, JCacheInformations> entry : cacheInfos.entrySet()) {
+			printLongWithFields("jcache_misses_count", entry.getKey(),
 					entry.getValue().getCacheMisses());
 		}
 	}
@@ -455,10 +487,10 @@ class PrometheusController {
 					"unix open file descriptors percentage",
 					javaInformations.getUnixOpenFileDescriptorPercentage());
 		}
-		if (javaInformations.getFreeDiskSpaceInTemp() >= 0) {
-			printLong(MetricType.GAUGE, "system_tmp_space_free_bytes", "tmp space available",
-					javaInformations.getFreeDiskSpaceInTemp());
-		}
+		printLong(MetricType.GAUGE, "system_tmp_space_free_bytes", "tmp space available",
+				javaInformations.getFreeDiskSpaceInTemp());
+		printLong(MetricType.GAUGE, "system_tmp_space_usable_bytes", "tmp space usable",
+				javaInformations.getUsableDiskSpaceInTemp());
 
 		// jvm
 		printLong(MetricType.GAUGE, "jvm_start_time", "jvm start time",
@@ -506,6 +538,25 @@ class PrometheusController {
 
 		printDouble(MetricType.COUNTER, "memory_gc_millis", "gc time millis",
 				memoryInformations.getGarbageCollectionTimeMillis());
+
+		if (memoryInformations.getUsedBufferedMemory() >= 0) {
+			printLong(MetricType.GAUGE, "memory_used_buffered_bytes",
+					"used buffered memory in bytes", memoryInformations.getUsedBufferedMemory());
+		}
+		printLong(MetricType.GAUGE, "memory_used_non_heap_bytes", "used non-heap memory in bytes",
+				memoryInformations.getUsedNonHeapMemory());
+		if (memoryInformations.getUsedSwapSpaceSize() >= 0) {
+			printLong(MetricType.GAUGE, "memory_used_swap_space_bytes",
+					"used memory in the OS swap space in bytes",
+					memoryInformations.getUsedSwapSpaceSize());
+		}
+		if (memoryInformations.getUsedPhysicalMemorySize() > 0) {
+			printLong(MetricType.GAUGE, "memory_used_physical_bytes",
+					"used memory in the OS in bytes",
+					memoryInformations.getUsedPhysicalMemorySize());
+		}
+		printLong(MetricType.GAUGE, "loaded_classes_count", "loaded classes count",
+				memoryInformations.getLoadedClassesCount());
 	}
 
 	/**

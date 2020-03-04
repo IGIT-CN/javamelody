@@ -12,6 +12,7 @@
 <a href="jsp/sql.jsp">statistics sql</a><br/>
 <a href="jsp/directSql.jsp">statistics sql via driver</a><br/>
 <a href="jsp/spring.jsp">statistics spring</a><br/>
+<a href="jsp/spring-aop.jsp">statistics spring aop</a><br/>
 <a href="jsp/guice.jsp">statistics guice</a><br/>
 <a href="jsp/service.jsp">statistics services</a><br/>
 <a href="jsp/jspDispatch.jsp">statistics jsp dispatch</a><br/>
@@ -20,7 +21,9 @@
 <a href="jsp/log.jsp">statistics log</a><br/>
 <a href="jsp/needsSession.jsp">session init</a><br/>
 <a href="jsp/cache.jsp">cache</a><br/>
+<a href="jsp/jcache.jsp">jcache</a><br/>
 <a href="jsp/job.jsp">job</a><br/>
+<a href="jsp/prometheusTags.jsp">prometheus tags</a><br/>
 <br/>
 <b>Reports</b><br/>
 <a href="monitoring">javamelody</a><br/>

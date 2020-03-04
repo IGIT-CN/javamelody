@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -152,6 +152,17 @@ abstract class FilterServletResponseWrapper extends HttpServletResponseWrapper {
 	/** {@inheritDoc} */
 	@Override
 	public void flushBuffer() throws IOException {
+		if (writer != null) {
+			writer.flush();
+		} else if (stream != null) {
+			stream.flush();
+		} else {
+			// writes status code and headers when no content (issue #836)
+			super.flushBuffer();
+		}
+	}
+
+	public void flushStream() throws IOException {
 		if (writer != null) {
 			writer.flush();
 		} else if (stream != null) {

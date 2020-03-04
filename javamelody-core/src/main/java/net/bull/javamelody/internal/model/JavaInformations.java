@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -86,6 +86,7 @@ public class JavaInformations implements Serializable { // NOPMD
 	private final Date startDate;
 	private final String jvmArguments;
 	private final long freeDiskSpaceInTemp;
+	private final long usableDiskSpaceInTemp;
 	private final int threadCount;
 	private final int peakThreadCount;
 	private final long totalStartedThreadCount;
@@ -95,6 +96,8 @@ public class JavaInformations implements Serializable { // NOPMD
 	private final List<ThreadInformations> threadInformationsList;
 	@SuppressWarnings("all")
 	private final List<CacheInformations> cacheInformationsList;
+	@SuppressWarnings("all")
+	private final List<JCacheInformations> jcacheInformationsList;
 	@SuppressWarnings("all")
 	private final List<JobInformations> jobInformationsList;
 	@SuppressWarnings("all")
@@ -121,6 +124,17 @@ public class JavaInformations implements Serializable { // NOPMD
 		/** {@inheritDoc} */
 		@Override
 		public int compare(CacheInformations cache1, CacheInformations cache2) {
+			return cache1.getName().compareToIgnoreCase(cache2.getName());
+		}
+	}
+
+	static final class JCacheInformationsComparator
+			implements Comparator<JCacheInformations>, Serializable {
+		private static final long serialVersionUID = 1L;
+
+		/** {@inheritDoc} */
+		@Override
+		public int compare(JCacheInformations cache1, JCacheInformations cache2) {
 			return cache1.getName().compareToIgnoreCase(cache2.getName());
 		}
 	}
@@ -179,6 +193,7 @@ public class JavaInformations implements Serializable { // NOPMD
 		peakThreadCount = threadBean.getPeakThreadCount();
 		totalStartedThreadCount = threadBean.getTotalStartedThreadCount();
 		freeDiskSpaceInTemp = Parameters.TEMPORARY_DIRECTORY.getFreeSpace();
+		usableDiskSpaceInTemp = Parameters.TEMPORARY_DIRECTORY.getUsableSpace();
 		springBeanExists = SPRING_AVAILABLE && SpringContext.getSingleton() != null;
 
 		if (includeDetails) {
@@ -186,6 +201,7 @@ public class JavaInformations implements Serializable { // NOPMD
 			dataSourceDetails = buildDataSourceDetails();
 			threadInformationsList = buildThreadInformationsList();
 			cacheInformationsList = CacheInformations.buildCacheInformationsList();
+			jcacheInformationsList = JCacheInformations.buildJCacheInformationsList();
 			jobInformationsList = JobInformations.buildJobInformationsList();
 			hsErrPidList = HsErrPid.buildHsErrPidList();
 			pid = PID.getPID();
@@ -194,6 +210,7 @@ public class JavaInformations implements Serializable { // NOPMD
 			dataSourceDetails = null;
 			threadInformationsList = null;
 			cacheInformationsList = null;
+			jcacheInformationsList = null;
 			jobInformationsList = null;
 			hsErrPidList = null;
 			pid = null;
@@ -355,7 +372,14 @@ public class JavaInformations implements Serializable { // NOPMD
 		}
 		final Thread[] threadsArray = new Thread[group.activeCount()];
 		group.enumerate(threadsArray, true);
-		return Arrays.asList(threadsArray);
+		final List<Thread> threads = new ArrayList<Thread>(threadsArray.length);
+		for (final Thread thread : threadsArray) {
+			// threadsArray may contain null if a thread has just died between activeCount and enumerate
+			if (thread != null) {
+				threads.add(thread);
+			}
+		}
+		return threads;
 	}
 
 	private static long[] getDeadlockedThreads(ThreadMXBean threadBean) {
@@ -413,7 +437,7 @@ public class JavaInformations implements Serializable { // NOPMD
 				}
 			}
 		} catch (final Exception e) {
-			result.append(e.toString());
+			result.append(e);
 		}
 		if (result.length() > 0) {
 			return result.toString();
@@ -589,6 +613,10 @@ public class JavaInformations implements Serializable { // NOPMD
 		return freeDiskSpaceInTemp;
 	}
 
+	public long getUsableDiskSpaceInTemp() {
+		return usableDiskSpaceInTemp;
+	}
+
 	public int getThreadCount() {
 		return threadCount;
 	}
@@ -622,6 +650,14 @@ public class JavaInformations implements Serializable { // NOPMD
 		final List<CacheInformations> result = new ArrayList<CacheInformations>(
 				cacheInformationsList);
 		Collections.sort(result, new CacheInformationsComparator());
+		return Collections.unmodifiableList(result);
+	}
+
+	public List<JCacheInformations> getJCacheInformationsList() {
+		// on trie sur demande (si affichage)
+		final List<JCacheInformations> result = new ArrayList<JCacheInformations>(
+				jcacheInformationsList);
+		Collections.sort(result, new JCacheInformationsComparator());
 		return Collections.unmodifiableList(result);
 	}
 
@@ -664,6 +700,10 @@ public class JavaInformations implements Serializable { // NOPMD
 
 	public boolean isCacheEnabled() {
 		return cacheInformationsList != null && !cacheInformationsList.isEmpty();
+	}
+
+	public boolean isJCacheEnabled() {
+		return jcacheInformationsList != null && !jcacheInformationsList.isEmpty();
 	}
 
 	public boolean isJobEnabled() {

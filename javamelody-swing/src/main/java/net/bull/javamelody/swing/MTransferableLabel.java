@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -144,7 +144,7 @@ public class MTransferableLabel extends JLabel {
 		if (imageData != null) {
 			final File file = ImageFileChooser.chooseImage(this, false, getFileName());
 			if (file != null) {
-				try (OutputStream fileOutputStream = new BufferedOutputStream(
+				try (final OutputStream fileOutputStream = new BufferedOutputStream(
 						new FileOutputStream(file))) {
 					fileOutputStream.write(imageData);
 				}

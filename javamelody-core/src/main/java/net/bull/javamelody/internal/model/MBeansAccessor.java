@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -42,15 +42,19 @@ final class MBeansAccessor {
 	private static final ObjectName THREADING = createObjectName("java.lang:type=Threading");
 	private static final boolean MBEAN_ALLOCATED_BYTES_ENABLED = getAttributesNames(THREADING)
 			.contains("ThreadAllocatedMemoryEnabled");
-	private static final String[] THREAD_ALLOCATED_BYTES_SIGNATURE = new String[] {
-			long.class.getName(), };
+	private static final String[] THREAD_ALLOCATED_BYTES_SIGNATURE = { long.class.getName(), };
 
 	private MBeansAccessor() {
 		super();
 	}
 
 	static Set<ObjectName> getTomcatThreadPools() {
-		return MBEAN_SERVER.queryNames(createObjectName("*:type=ThreadPool,*"), null);
+		final Set<ObjectName> result = new HashSet<ObjectName>(
+				MBEAN_SERVER.queryNames(createObjectName("*:type=ThreadPool,*"), null));
+		// #843 Tomcat info is not available anymore
+		result.removeAll(MBEAN_SERVER.queryNames(
+				createObjectName("*:type=ThreadPool,*,subType=SocketProperties"), null));
+		return result;
 	}
 
 	static Set<ObjectName> getTomcatGlobalRequestProcessors() {

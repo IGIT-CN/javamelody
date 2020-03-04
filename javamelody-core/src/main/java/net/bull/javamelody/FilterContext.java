@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -58,6 +58,7 @@ import net.bull.javamelody.internal.web.MonitoringController;
  */
 class FilterContext {
 	private static final boolean MOJARRA_AVAILABLE = isMojarraAvailable();
+	private static final boolean JPA2_AVAILABLE = isJpa2Available();
 
 	private final String applicationType;
 	private final Collector collector;
@@ -121,6 +122,9 @@ class FilterContext {
 
 			if (MOJARRA_AVAILABLE) {
 				JsfActionHelper.initJsfActionListener();
+			}
+			if (JPA2_AVAILABLE) {
+				JpaPersistence.initPersistenceProviderResolver();
 			}
 
 			this.samplingProfiler = initSamplingProfiler();
@@ -349,6 +353,15 @@ class FilterContext {
 		}
 	}
 
+	private static boolean isJpa2Available() {
+		try {
+			Class.forName("javax.persistence.spi.PersistenceProviderResolverHolder");
+			return true;
+		} catch (final Throwable e) { // NOPMD
+			return false;
+		}
+	}
+
 	private void logSystemInformationsAndParameters() {
 		// log les principales informations sur le système et sur les paramètres définis spécifiquement
 		LOG.debug("OS: " + System.getProperty("os.name") + ' '
@@ -370,7 +383,8 @@ class FilterContext {
 			final String value = parameter.getValue();
 			if (value != null && parameter != Parameter.ANALYTICS_ID) {
 				if (parameter == Parameter.AUTHORIZED_USERS) {
-					LOG.debug("parameter defined: " + parameter.getCode() + "=*****");
+					LOG.debug("parameter defined: " + Parameter.AUTHORIZED_USERS.getCode()
+							+ "=*****");
 				} else {
 					LOG.debug("parameter defined: " + parameter.getCode() + '=' + value);
 				}
@@ -404,7 +418,7 @@ class FilterContext {
 				getClass().getName().length() - getClass().getSimpleName().length() - 1);
 		String webapp = Parameters.getContextPath(Parameters.getServletContext());
 		if (webapp.length() >= 1 && webapp.charAt(0) == '/') {
-			webapp = webapp.substring(1, webapp.length());
+			webapp = webapp.substring(1);
 		}
 		final List<Counter> counters = collector.getCounters();
 		final MBeanServer platformMBeanServer = MBeans.getPlatformMBeanServer();

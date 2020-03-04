@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -128,8 +128,9 @@ public abstract class HtmlAbstractReport {
 	}
 
 	void writeShowHideLink(String idToShow, String label) throws IOException {
-		writeln("<a href=\"javascript:showHide('" + idToShow + "');\" class='noPrint'><img id='"
-				+ idToShow + "Img' src='?resource=bullets/plus.png' alt=''/> " + label + "</a>");
+		writeln("<a href=\"javascript:showHide('" + idToShow + "');\" class='noPrint' id='"
+				+ idToShow + "A'><img id='" + idToShow
+				+ "Img' src='?resource=bullets/plus.png' alt=''/> " + label + "</a>");
 	}
 
 	/**

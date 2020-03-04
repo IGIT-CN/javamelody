@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -231,14 +231,14 @@ public class MonitoringFilter implements Filter {
 		try {
 			JdbcWrapper.ACTIVE_THREAD_COUNT.incrementAndGet();
 			// on binde le contexte de la requête http pour les requêtes sql
-			httpCounter.bindContext(requestName, completeRequestName, httpRequest,
-					httpRequest.getRemoteUser(), startCpuTime, startAllocatedBytes);
+			httpCounter.bindContext(requestName, completeRequestName, httpRequest, startCpuTime,
+					startAllocatedBytes);
 			// on binde la requête http (utilisateur courant et requête complète) pour les derniers logs d'erreurs
 			httpRequest.setAttribute(CounterError.REQUEST_KEY, completeRequestName);
 			CounterError.bindRequest(httpRequest);
 			chain.doFilter(wrappedRequest, wrappedResponse);
 			if (servletApi2 || !httpRequest.isAsyncStarted()) {
-				wrappedResponse.flushBuffer();
+				wrappedResponse.flushStream();
 			}
 		} catch (final Throwable t) { // NOPMD
 			// on catche Throwable pour avoir tous les cas d'erreur système
@@ -270,7 +270,6 @@ public class MonitoringFilter implements Filter {
 				} else {
 					allocatedKBytes = -1;
 				}
-
 				JdbcWrapper.ACTIVE_THREAD_COUNT.decrementAndGet();
 				putUserInfoInSession(httpRequest);
 				if (systemException != null) {
@@ -291,7 +290,7 @@ public class MonitoringFilter implements Filter {
 				// prise en compte de Spring bestMatchingPattern s'il y a
 				requestName = CounterRequestContext.getHttpRequestName(httpRequest, requestName);
 				// taille du flux sortant
-				final int responseSize = wrappedResponse.getDataLength();
+				final long responseSize = wrappedResponse.getDataLength();
 				// nom identifiant la requête
 				if (wrappedResponse.getCurrentStatus() == HttpServletResponse.SC_NOT_FOUND) {
 					// Sécurité : si status http est 404, alors requestName est Error404
@@ -303,7 +302,8 @@ public class MonitoringFilter implements Filter {
 				httpCounter.addRequest(requestName, duration, cpuUsedMillis, allocatedKBytes,
 						systemError, responseSize);
 				// on log sur Log4J ou java.util.logging dans la catégorie correspond au nom du filtre dans web.xml
-				log(httpRequest, requestName, duration, systemError, responseSize);
+				log(httpRequest, requestName, duration, systemError,
+						wrappedResponse.getCurrentStatus(), responseSize);
 			} finally {
 				// normalement le unbind du contexte a été fait dans httpCounter.addRequest
 				// mais pour être sûr au cas où il y ait une exception comme OutOfMemoryError
@@ -497,13 +497,13 @@ public class MonitoringFilter implements Filter {
 
 	// cette méthode est protected pour pouvoir être surchargée dans une classe définie par l'application
 	protected void log(HttpServletRequest httpRequest, String requestName, long duration,
-			boolean systemError, int responseSize) {
+			boolean systemError, int responseStatus, long responseSize) {
 		if (!logEnabled) {
 			return;
 		}
 		final String filterName = filterConfig.getFilterName();
-		LOG.logHttpRequest(httpRequest, requestName, duration, systemError, responseSize,
-				filterName);
+		LOG.logHttpRequest(httpRequest, requestName, duration, systemError, responseStatus,
+				responseSize, filterName);
 	}
 
 	private static void throwException(Throwable t) throws IOException, ServletException {

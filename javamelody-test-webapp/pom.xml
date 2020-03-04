@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>net.bull.javamelody</groupId>
 		<artifactId>javamelody-parent</artifactId>
-		<version>1.78.0-SNAPSHOT</version>
+		<version>1.83.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>javamelody-test-webapp</artifactId>
 	<packaging>war</packaging>
@@ -18,24 +18,21 @@
 			<version>${project.version}</version>
 		</dependency>
 
-		<!-- Dépendance H2 -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<version>1.3.170</version>
+			<version>1.4.200</version>
 			<scope>runtime</scope>
 		</dependency>
-		<!-- Dépendance Mysql -->
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
-			<version>5.0.5</version>
+			<version>8.0.19</version>
 		</dependency>
-		<!-- Presque les mêmes dépendances que javamelody-core -->
 		<dependency>
 			<groupId>javax.servlet</groupId>
 			<artifactId>javax.servlet-api</artifactId>
-			<version>3.1.0</version>
+			<version>4.0.1</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
@@ -47,56 +44,39 @@
 		<dependency>
 			<groupId>javax.ejb</groupId>
 			<artifactId>javax.ejb-api</artifactId>
-			<version>3.2</version>
+			<version>3.2.2</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>javax.interceptor</groupId>
 			<artifactId>javax.interceptor-api</artifactId>
-			<version>1.2</version>
+			<version>1.2.2</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.sun.faces</groupId>
-			<artifactId>jsf-impl</artifactId>
-			<version>2.1.5</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>javax.el</groupId>
-			<artifactId>javax.el-api</artifactId>
-			<version>2.2.1</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>javax.faces</groupId>
-			<artifactId>javax.faces-api</artifactId>
-			<version>2.1</version>
-			<scope>provided</scope>
+			<groupId>org.glassfish</groupId>
+			<artifactId>javax.faces</artifactId>
+			<version>2.4.0</version>
 		</dependency>
 		<dependency>
 			<groupId>log4j</groupId>
 			<artifactId>log4j</artifactId>
-			<version>1.2.16</version>
-			<optional>true</optional>
+			<version>1.2.17</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
 			<artifactId>log4j-core</artifactId>
-			<version>2.5</version>
-			<optional>true</optional>
+			<version>2.13.0</version>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
-			<version>0.9.19</version>
-			<optional>true</optional>
+			<version>1.2.3</version>
 		</dependency>
 		<dependency>
 			<groupId>com.lowagie</groupId>
 			<artifactId>itext</artifactId>
 			<version>2.1.7</version>
-			<optional>true</optional>
 			<exclusions>
 				<exclusion>
 					<artifactId>bcmail-jdk14</artifactId>
@@ -116,20 +96,27 @@
 			<groupId>net.sf.ehcache</groupId>
 			<artifactId>ehcache</artifactId>
 			<version>1.6.2</version>
-			<optional>true</optional>
+		</dependency>
+ 		<dependency>
+            <groupId>org.ehcache</groupId>
+            <artifactId>ehcache</artifactId>
+            <version>3.8.1</version>
 		</dependency>
 		<dependency>
+			<groupId>javax.cache</groupId>
+			<artifactId>cache-api</artifactId>
+			<version>1.1.1</version>
+		</dependency>
+ 		<dependency>
 			<groupId>quartz</groupId>
 			<artifactId>quartz</artifactId>
 			<version>1.5.2</version>
-			<optional>true</optional>
 		</dependency>
 		<!--
 		<dependency>
 			<groupId>org.quartz-scheduler</groupId>
 			<artifactId>quartz</artifactId>
 			<version>2.1.2</version>
-			<optional>true</optional>
 			<exclusions>
 				<exclusion>
 					<artifactId>c3p0</artifactId>
@@ -141,119 +128,111 @@
 		<dependency>
 			<groupId>com.thoughtworks.xstream</groupId>
 			<artifactId>xstream</artifactId>
-			<version>1.4.10</version>
-			<optional>true</optional>
+			<version>1.4.11.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.8.6</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
 			<artifactId>dbcp</artifactId>
-			<version>6.0.18</version>
+			<version>6.0.53</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
 			<artifactId>tomcat-dbcp</artifactId>
-			<version>8.0.24</version>
+			<version>9.0.30</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>commons-dbcp</groupId>
 			<artifactId>commons-dbcp</artifactId>
-			<version>1.2.2</version>
-			<optional>true</optional>
+			<version>1.4</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-dbcp2</artifactId>
-			<version>2.1.1</version>
-			<optional>true</optional>
+			<version>2.7.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.tomcat</groupId>
 			<artifactId>tomcat-jdbc</artifactId>
-			<version>7.0.27</version>
-			<optional>true</optional>
+			<version>9.0.30</version>
 		</dependency>
-		<!-- Dépendance optionnelle spring aop (qui inclus spring core, spring 
+		<!-- Dépendance spring aop (qui inclus spring core, spring 
 			beans, aop alliance et commons-logging) -->
 		<dependency>
 			<groupId>org.springframework</groupId>
-			<artifactId>spring-aop</artifactId>
-			<version>3.1.0.RELEASE</version>
-			<optional>true</optional>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework</groupId>
 			<artifactId>spring-context</artifactId>
-			<version>3.1.0.RELEASE</version>
-			<optional>true</optional>
+			<version>5.2.3.RELEASE</version>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework</groupId>
 			<artifactId>spring-web</artifactId>
-			<version>3.1.0.RELEASE</version>
-			<optional>true</optional>
+			<version>5.2.3.RELEASE</version>
 		</dependency>
-		<!-- Dépendance optionnelle google guice (aop) -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-jdbc</artifactId>
+			<version>5.2.3.RELEASE</version>
+		</dependency>
+		<dependency>
+			<!-- for Spring RestTemplate in unit tests -->
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<version>2.10.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-mongodb</artifactId>
+			<version>2.2.4.RELEASE</version>
+		</dependency>
 		<dependency>
 			<groupId>com.google.inject</groupId>
 			<artifactId>guice</artifactId>
-			<version>2.0</version>
-			<optional>true</optional>
+			<version>4.2.2</version>
 		</dependency>
-		<!-- Dépendance optionnelle xwork pour interceptor struts 2 -->
+		<!-- Dépendance xwork pour interceptor struts 2 -->
 		<dependency>
-			<groupId>com.opensymphony</groupId>
-			<artifactId>xwork</artifactId>
-			<version>2.1.0</version>
-			<optional>true</optional>
+			<groupId>org.apache.struts.xwork</groupId>
+			<artifactId>xwork-core</artifactId>
+			<version>2.3.37</version>
 		</dependency>
-		<!-- Dépendance optionnelle hibernate -->
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-core</artifactId>
-			<version>3.6.9.Final</version>
-			<optional>true</optional>
+			<version>5.4.2.Final</version>
 		</dependency>
-		<!-- Dépendance optionnelle mongodb-driver -->
 		<dependency>
-			<groupId>org.mongodb</groupId>
-			<artifactId>mongodb-driver</artifactId>
-			<version>3.3.0</version>
-			<optional>true</optional>
+			<groupId>org.apache.openjpa</groupId>
+			<artifactId>openjpa</artifactId>
+			<version>3.1.0</version>
+			<scope>provided</scope>
 		</dependency>
-		<!-- Dépendance optionnelle AWS Java SDK -->
 		<dependency>
 			<groupId>com.amazonaws</groupId>
 			<artifactId>aws-java-sdk-cloudwatch</artifactId>
 			<version>1.11.136</version>
-			<optional>true</optional>
 		</dependency>
 		<dependency>
 		    <groupId>com.amazonaws</groupId>
 		    <artifactId>aws-java-sdk-s3</artifactId>
 		    <version>1.11.136</version>
 		</dependency>
-		<!-- Dépendance JUnit -->
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<version>4.11</version>
-			<scope>provided</scope>
+			<version>4.13</version>
+			<scope>compile</scope>
 		</dependency>
-		<!-- Dépendance EasyMock -->
 		<dependency>
 			<groupId>org.easymock</groupId>
 			<artifactId>easymock</artifactId>
-			<version>3.1</version>
-			<scope>provided</scope>
-		</dependency>
-		<!-- Dépendance OpenJpa -->
-		<dependency>
-			<groupId>org.apache.openjpa</groupId>
-			<artifactId>openjpa</artifactId>
-			<version>2.2.2</version>
-			<scope>provided</scope>
+			<version>4.1</version>
+			<scope>compile</scope>
 		</dependency>
 	</dependencies>
 
@@ -272,7 +251,7 @@
 		<plugins>
 			<plugin>
 				<artifactId>maven-war-plugin</artifactId>
-				<version>2.6</version>
+				<version>3.2.3</version>
 				<configuration>
 					<failOnMissingWebXml>false</failOnMissingWebXml>
 					<webResources>
@@ -280,8 +259,6 @@
 							<directory>../javamelody-core/src/test/test-webapp</directory>
 							<excludes>
 								<exclude>WEB-INF/classes/**</exclude>
-								<!-- JRobin is already included with the javamelody dependency -->
-								<exclude>WEB-INF/lib/jrobin*.*</exclude>
 							</excludes>
 						</resource>
 					</webResources>

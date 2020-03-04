@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -77,8 +77,8 @@ public class TestTomcatInformations {
 		@Override
 		public Object gettoStringException() {
 			return new Object() {
-				@Override
 				/** {@inheritDoc} */
+				@Override
 				public String toString() {
 					throw new IllegalStateException("test");
 				}

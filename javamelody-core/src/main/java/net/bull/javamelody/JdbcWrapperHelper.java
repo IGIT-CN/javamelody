@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -575,7 +575,7 @@ final class JdbcWrapperHelper {
 		final ClassLoader classLoader = objectClass.getClassLoader();
 		try {
 			final Constructor<?> constructor = Proxy.getProxyClass(classLoader, interfacesArray)
-					.getConstructor(new Class[] { InvocationHandler.class });
+					.getConstructor(InvocationHandler.class);
 			// issue 475: workaround for a j.l.r.Proxy change in Java 8 - proxy class for non-public interface is non-public now.
 			// Ref: https://netbeans.org/bugzilla/show_bug.cgi?id=229191
 			// and http://hg.netbeans.org/jet-main/rev/3238e03c676f

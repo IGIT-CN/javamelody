@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -18,8 +18,11 @@
 package net.bull.javamelody.internal.web.html;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -40,6 +43,7 @@ import net.bull.javamelody.internal.model.CollectorServer;
 import net.bull.javamelody.internal.model.Counter;
 import net.bull.javamelody.internal.model.CounterRequestContext;
 import net.bull.javamelody.internal.model.HsErrPid;
+import net.bull.javamelody.internal.model.JCacheInformations;
 import net.bull.javamelody.internal.model.JRobin;
 import net.bull.javamelody.internal.model.JavaInformations;
 import net.bull.javamelody.internal.model.JobInformations;
@@ -84,9 +88,7 @@ class HtmlCoreReport extends HtmlAbstractReport {
 	}
 
 	void toHtml(String message, String anchorNameForRedirect) throws IOException {
-		if (UpdateChecker.getNewJavamelodyVersion() != null) {
-			writeVersionAlert();
-		}
+		writeAlerts();
 		if (collectorServer != null) {
 			writeApplicationsLinks();
 		}
@@ -147,6 +149,12 @@ class HtmlCoreReport extends HtmlAbstractReport {
 			writeln("#Caches#</h3>");
 			writeCaches();
 		}
+		if (isJCacheEnabled()) {
+			writeln("<h3 class='chapterTitle'><img src='?resource=caches.png' alt='#Caches#'/>");
+			writeAnchor("caches", I18N.getString("Caches"));
+			writeln("#Caches#</h3>");
+			writeJCaches();
+		}
 		//		else if (JavaInformations.STACK_TRACES_ENABLED) {
 		//			// pour que les tooltips des stack traces s'affichent dans le scroll
 		//			writeln("<br/><br/><br/><br/>");
@@ -158,12 +166,35 @@ class HtmlCoreReport extends HtmlAbstractReport {
 		writeDurationAndOverhead();
 	}
 
-	private void writeVersionAlert() throws IOException {
-		writeln("<div align='center' style='font-weight: bold;'>");
-		writeln("<img src='?resource=alert.png' alt='alert'/>");
-		writeDirectly(I18N.getFormattedString("version_alert",
-				UpdateChecker.getNewJavamelodyVersion(), Parameters.JAVAMELODY_VERSION));
-		writeln("</div>");
+	private void writeAlerts() throws IOException {
+		final String newJavamelodyVersion = UpdateChecker.getNewJavamelodyVersion();
+		if (newJavamelodyVersion != null) {
+			writeln("<div align='center' style='font-weight: bold;'>");
+			writeln("<img src='?resource=alert.png' alt='alert'/>");
+			writeDirectly(I18N.getFormattedString("version_alert", newJavamelodyVersion,
+					Parameters.JAVAMELODY_VERSION));
+			writeln("</div>");
+		}
+		final Throwable lastCollectorException = collector.getLastCollectorException();
+		if (lastCollectorException != null) {
+			writeln("<div style='font-weight: bold;'>");
+			writeln("<img src='?resource=alert.png' alt='alert'/>");
+			writeDirectly(htmlEncodeButNotSpace(lastCollectorException.toString()));
+			writeln("</div>");
+			writeShowHideLink("detailsLastCollectorException", "#Details#");
+			writeln("<div id='detailsLastCollectorException' style='display: none;'><div>");
+			final StringWriter stackTraceWriter = new StringWriter(200);
+			lastCollectorException.printStackTrace(new PrintWriter(stackTraceWriter));
+			for (final String stackTraceElement : stackTraceWriter.toString().split("[\n\r]")) {
+				if (!stackTraceElement.isEmpty()) {
+					// writeDirectly pour ne pas gérer de traductions car les liens contiennent '#'
+					writeDirectly(
+							HtmlSourceReport.htmlEncodeStackTraceElementAndTabs(stackTraceElement));
+					writeDirectly("<br/>\n");
+				}
+			}
+			writeln("</div></div>");
+		}
 	}
 
 	private void writeSummary() throws IOException {
@@ -283,12 +314,16 @@ class HtmlCoreReport extends HtmlAbstractReport {
 				I18N.getString("Stats") + ' ' + counter.getName().toLowerCase(Locale.ENGLISH));
 		final String counterLabel = getString(counter.getName() + "Label");
 		write(getFormattedString("Statistiques_compteur", counterLabel));
-		writeln(" - " + range.getLabel() + "</h3>");
+		write(" - " + range.getLabel());
+		if (range.getPeriod() != Period.TOUT) {
+			write(" #depuis_minuit#");
+		}
+		writeln("</h3>");
 	}
 
-	static void writeAddAndRemoveApplicationLinks(String currentApplication, Writer writer)
-			throws IOException {
-		new HtmlForms(writer).writeAddAndRemoveApplicationLinks(currentApplication);
+	static void writeAddAndRemoveApplicationLinks(String currentApplication,
+			Collection<String> applications, Writer writer) throws IOException {
+		new HtmlForms(writer).writeAddAndRemoveApplicationLinks(currentApplication, applications);
 	}
 
 	void writeMessageIfNotNull(String message, String partToRedirectTo,
@@ -333,26 +368,43 @@ class HtmlCoreReport extends HtmlAbstractReport {
 			writeln("</div><br/>");
 		}
 
-		writeGraphs(collector.getDisplayedCounterJRobins());
+		writeGraphs(collector.getDisplayedCounterJRobins(), false);
 		final Collection<JRobin> otherJRobins = collector.getDisplayedOtherJRobins();
 		if (!otherJRobins.isEmpty()) {
 			writeln("<div align='right'>");
 			writeShowHideLink("detailsGraphs", "#Autres_courbes#");
+			writeln("<script type='text/javascript'>");
+			writeln("function loadImages(elementId) {");
+			writeln("  var descendents = document.getElementById(elementId).getElementsByTagName('*');");
+			writeln("  for (var i = 0; i < descendents.length; i++) {");
+			writeln("    var element = descendents[i];");
+			writeln("    if (element instanceof HTMLImageElement && element.src == '') {");
+			writeln("      element.src = element.dataset.src;");
+			writeln("    }");
+			writeln("  }");
+			writeln("}");
+			writeln("document.getElementById('detailsGraphsA').href=\"javascript:loadImages('detailsGraphs');showHide('detailsGraphs');\";");
+			writeln("</script>");
 			writeln(END_DIV);
 			writeln("<div id='detailsGraphs' style='display: none;'><div>");
-			writeGraphs(otherJRobins);
+			writeGraphs(otherJRobins, true);
 			writeln("</div></div>");
 		}
 	}
 
-	private void writeGraphs(Collection<JRobin> jrobins) throws IOException {
+	private void writeGraphs(Collection<JRobin> jrobins, boolean lazyGraphs) throws IOException {
 		int i = 0;
 		for (final JRobin jrobin : jrobins) {
 			final String jrobinName = jrobin.getName();
-			writeln("<a href='?part=graph&amp;graph=" + jrobinName
-					+ "'><img class='synthese' src='?width=200&amp;height=" + JRobin.SMALL_HEIGHT
-					+ "&amp;graph=" + jrobinName + "' alt=\"" + jrobin.getLabel() + "\" title=\""
-					+ jrobin.getLabel() + "\"/></a>");
+			write("<a href='?part=graph&amp;graph=" + jrobinName + "'><img class='synthese' ");
+			if (lazyGraphs) {
+				write("data-src");
+			} else {
+				write("src");
+			}
+			writeln("='?width=200&amp;height=" + JRobin.SMALL_HEIGHT + "&amp;graph=" + jrobinName
+					+ "' alt=\"" + jrobin.getLabel() + "\" title=\"" + jrobin.getLabel()
+					+ "\"/></a>");
 			i++;
 			if (i % 3 == 0) {
 				// un <br/> après httpSessions et avant activeThreads pour l'alignement
@@ -569,6 +621,15 @@ class HtmlCoreReport extends HtmlAbstractReport {
 		return false;
 	}
 
+	private boolean isJCacheEnabled() {
+		for (final JavaInformations javaInformations : javaInformationsList) {
+			if (javaInformations.isJCacheEnabled()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private boolean isJobEnabled() {
 		for (final JavaInformations javaInformations : javaInformationsList) {
 			if (javaInformations.isJobEnabled()) {
@@ -599,6 +660,28 @@ class HtmlCoreReport extends HtmlAbstractReport {
 			writeShowHideLink(id, "#Details#");
 			writeln("<br/><br/><div id='" + id + "' style='display: none;'><div>");
 			new HtmlCacheInformationsReport(cacheInformationsList, getWriter()).toHtml();
+			writeln("</div></div><br/>");
+			i++;
+		}
+	}
+
+	private void writeJCaches() throws IOException {
+		int i = 0;
+		for (final JavaInformations javaInformations : javaInformationsList) {
+			if (!javaInformations.isJCacheEnabled()) {
+				continue;
+			}
+			final List<JCacheInformations> jcacheInformationsList = javaInformations
+					.getJCacheInformationsList();
+			writeln("<b>");
+			writeln(getFormattedString("caches_sur", jcacheInformationsList.size(),
+					javaInformations.getHost()));
+			writeln("</b>");
+			writeln(SEPARATOR);
+			final String id = "jcaches_" + i;
+			writeShowHideLink(id, "#Details#");
+			writeln("<br/><br/><div id='" + id + "' style='display: none;'><div>");
+			new HtmlJCacheInformationsReport(jcacheInformationsList, getWriter()).toHtml();
 			writeln("</div></div><br/>");
 			i++;
 		}
@@ -639,14 +722,12 @@ class HtmlCoreReport extends HtmlAbstractReport {
 			write("<a href='?action=gc" + getCsrfTokenUrlPart()
 					+ "' onclick=\"javascript:return confirm('"
 					+ getStringForJavascript("confirm_ramasse_miette") + endOfOnClickConfirm);
-			write("<img src='?resource=broom.png' width='20' height='20' alt='#ramasse_miette#' /> #ramasse_miette#</a>");
-			writeln(separator);
 		} else {
 			write("<a href='?action=gc" + getCsrfTokenUrlPart() + "' onclick=\"javascript:alert('"
 					+ getStringForJavascript("ramasse_miette_desactive") + "');return false;\">");
-			write("<img src='?resource=broom.png' width='20' height='20' alt='#ramasse_miette#' /> #ramasse_miette#</a>");
-			writeln(separator);
 		}
+		write("<img src='?resource=broom.png' width='20' height='20' alt='#ramasse_miette#' /> #ramasse_miette#</a>");
+		writeln(separator);
 		write("<a href='?action=heap_dump" + getCsrfTokenUrlPart()
 				+ "' onclick=\"javascript:return confirm('"
 				+ getStringForJavascript("confirm_heap_dump") + endOfOnClickConfirm);
@@ -728,8 +809,9 @@ class HtmlCoreReport extends HtmlAbstractReport {
 	private void writeApplicationsLinks() throws IOException {
 		assert collectorServer != null;
 		writeln("<div align='center'>");
-		final Collection<String> applications = Parameters.getCollectorUrlsByApplications()
-				.keySet();
+		final Collection<String> applications = new ArrayList<String>();
+		applications.addAll(Parameters.getCollectorUrlsByApplications().keySet());
+		applications.addAll(Parameters.getApplicationsByAggregationApplication().keySet());
 		if (applications.size() > 1
 				|| !collectorServer.getLastCollectExceptionsByApplication().isEmpty()) {
 			final boolean tabularList = applications.size() > 10;
@@ -737,7 +819,8 @@ class HtmlCoreReport extends HtmlAbstractReport {
 				writeln("<table summary='applications'><tr><td>");
 				writeShowHideLink("chooseApplication", "#Choix_application#");
 				if (Parameters.getCollectorApplicationsFile().canWrite()) {
-					writeAddAndRemoveApplicationLinks(collector.getApplication(), getWriter());
+					writeAddAndRemoveApplicationLinks(collector.getApplication(), applications,
+							getWriter());
 				}
 				writeln("<div id='chooseApplication' style='display: none;'><div>&nbsp;&nbsp;&nbsp;");
 				writeApplicationsLinks(applications, tabularList);
@@ -746,11 +829,13 @@ class HtmlCoreReport extends HtmlAbstractReport {
 				writeln("&nbsp;&nbsp;&nbsp;#Choix_application# :&nbsp;&nbsp;&nbsp;");
 				writeApplicationsLinks(applications, tabularList);
 				if (Parameters.getCollectorApplicationsFile().canWrite()) {
-					writeAddAndRemoveApplicationLinks(collector.getApplication(), getWriter());
+					writeAddAndRemoveApplicationLinks(collector.getApplication(), applications,
+							getWriter());
 				}
 			}
 		} else if (Parameters.getCollectorApplicationsFile().canWrite()) {
-			writeAddAndRemoveApplicationLinks(collector.getApplication(), getWriter());
+			writeAddAndRemoveApplicationLinks(collector.getApplication(), applications,
+					getWriter());
 		}
 		writeln(END_DIV);
 	}

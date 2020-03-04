@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -59,7 +59,11 @@ public class TestSessionListener {
 	}
 
 	private void clearSessions() {
-		sessionListener.contextDestroyed(null);
+		final ServletContext servletContext = createNiceMock(ServletContext.class);
+		final ServletContextEvent servletContextEvent = new ServletContextEvent(servletContext);
+		replay(servletContext);
+		sessionListener.contextDestroyed(servletContextEvent);
+		verify(servletContext);
 	}
 
 	/** Test. */
@@ -174,8 +178,12 @@ public class TestSessionListener {
 	/** Test. */
 	@Test
 	public void testContextDestroyed() {
+		final ServletContext servletContext = createNiceMock(ServletContext.class);
+		final ServletContextEvent servletContextEvent = new ServletContextEvent(servletContext);
+		replay(servletContext);
 		sessionListener.sessionCreated(createSessionEvent());
-		sessionListener.contextDestroyed(null);
+		sessionListener.contextDestroyed(servletContextEvent);
+		verify(servletContext);
 		if (!SessionListener.getAllSessionsInformations().isEmpty()) {
 			fail("contextDestroyed");
 		}

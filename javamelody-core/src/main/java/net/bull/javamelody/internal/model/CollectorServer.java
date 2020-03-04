@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -17,18 +17,22 @@
  */
 package net.bull.javamelody.internal.model;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.log4j.Logger;
 
@@ -45,6 +49,8 @@ import net.bull.javamelody.internal.web.MailReport;
  */
 public class CollectorServer {
 	static final Logger LOGGER = Logger.getLogger("javamelody");
+
+	private static final String JENKINS_NODES_SUFFIX = " (Jenkins nodes)";
 
 	private static final int NB_COLLECT_THREADS = 10;
 
@@ -71,7 +77,14 @@ public class CollectorServer {
 					.getCollectorUrlsByApplications();
 			LOGGER.info("monitored applications: " + urlsByApplication.keySet());
 			LOGGER.info("urls of monitored applications: " + urlsByApplication);
-
+			final Map<String, List<String>> applicationsByAggregationApplication = Parameters
+					.getApplicationsByAggregationApplication();
+			if (!applicationsByAggregationApplication.isEmpty()) {
+				LOGGER.info("aggregations applications: "
+						+ applicationsByAggregationApplication.keySet());
+				LOGGER.info("aggregated applications of aggregation applications: "
+						+ applicationsByAggregationApplication);
+			}
 			final int periodMillis = Parameters.getResolutionSeconds() * 1000;
 			LOGGER.info("resolution of the monitoring in seconds: "
 					+ Parameters.getResolutionSeconds());
@@ -103,25 +116,57 @@ public class CollectorServer {
 	}
 
 	public void collectWithoutErrors() {
-		// clone pour éviter ConcurrentModificationException
-		final Map<String, List<URL>> clone;
 		try {
-			clone = new LinkedHashMap<String, List<URL>>(
+			final Map<String, List<URL>> urlsByApplication = new LinkedHashMap<String, List<URL>>(
 					Parameters.getCollectorUrlsByApplications());
+			final List<Future<?>> futures = new ArrayList<Future<?>>(
+					collectForApplicationsWithoutErrors(urlsByApplication));
+
+			final Map<String, List<String>> applicationsByAggregationApplication = Parameters
+					.getApplicationsByAggregationApplication();
+			if (!applicationsByAggregationApplication.isEmpty()) {
+				// on attend la fin des collectes par application avant les collectes par aggrégation
+				for (final Future<?> future : futures) {
+					future.get();
+				}
+				futures.clear();
+				urlsByApplication.clear();
+				for (final String aggregationApplication : applicationsByAggregationApplication
+						.keySet()) {
+					// pas la peine de lister les URLs, elles seront recalculées dans RemoteCollector.getURLs()
+					urlsByApplication.put(aggregationApplication, new ArrayList<URL>());
+				}
+				futures.addAll(collectForApplicationsWithoutErrors(urlsByApplication));
+				for (final Future<?> future : futures) {
+					future.get();
+				}
+			}
 		} catch (final IOException e) {
 			LOGGER.warn(e.getMessage(), e);
-			return;
+		} catch (final ConcurrentModificationException e) {
+			LOGGER.warn(e.getMessage(), e);
+		} catch (final InterruptedException e) {
+			LOGGER.warn(e.getMessage(), e);
+		} catch (final ExecutionException e) {
+			LOGGER.warn(e.getMessage(), e);
 		}
-		for (final Map.Entry<String, List<URL>> entry : clone.entrySet()) {
+	}
+
+	private List<Future<?>> collectForApplicationsWithoutErrors(
+			Map<String, List<URL>> urlsByApplication) {
+		final List<Future<?>> futures = new ArrayList<Future<?>>();
+		for (final Map.Entry<String, List<URL>> entry : urlsByApplication.entrySet()) {
 			final String application = entry.getKey();
 			final List<URL> urls = entry.getValue();
-			executorService.submit(new Runnable() {
+			final Future<?> future = executorService.submit(new Runnable() {
 				@Override
 				public void run() {
 					collectForApplicationWithoutErrors(application, urls);
 				}
 			});
+			futures.add(future);
 		}
+		return futures;
 	}
 
 	public String collectForApplicationForAction(String application, List<URL> urls)
@@ -154,7 +199,7 @@ public class CollectorServer {
 				if (becameUnavailable) {
 					final String subject = "The application " + application
 							+ " is unavailable for the monitoring server";
-					final String message = subject + "\n\nCause:\n" + e.toString();
+					final String message = subject + "\n\nCause:\n" + e;
 					notifyAdmins(subject, message);
 				}
 			} catch (final Throwable e2) { // NOPMD
@@ -164,16 +209,34 @@ public class CollectorServer {
 		}
 	}
 
-	String collectForApplication(String application, List<URL> urls) throws IOException {
+	private void collectForApplication(String application, List<URL> urls) throws IOException {
 		final boolean remoteCollectorAvailable = isApplicationDataAvailable(application);
 		final RemoteCollector remoteCollector;
 		if (!remoteCollectorAvailable) {
-			remoteCollector = new RemoteCollector(application, urls);
+			if (application.endsWith(JENKINS_NODES_SUFFIX)) {
+				// nécessaire ici après redémarrage du serveur de collecte
+				final String monitoringPath = Parameters.getMonitoringPath();
+				final List<URL> monitoringNodesUrls = new ArrayList<URL>(urls.size());
+				for (final URL url : urls) {
+					monitoringNodesUrls.add(new URL(
+							url.toString().replace(monitoringPath, monitoringPath + "/nodes")));
+				}
+				remoteCollector = new RemoteCollector(application, monitoringNodesUrls);
+			} else {
+				remoteCollector = new RemoteCollector(application, urls);
+			}
 		} else {
 			remoteCollector = getRemoteCollectorByApplication(application);
 		}
 
-		final String messageForReport = collectForApplication(remoteCollector);
+		if (remoteCollector.isAggregationApplication()) {
+			// on le refait à chaque fois car il pouvait en manquer avant
+			final List<RemoteCollector> remoteCollectors = getAvailableRemoteCollectorsByApplications(
+					Parameters.getApplicationsByAggregationApplication().get(application));
+			remoteCollector.setRemoteCollectors(remoteCollectors);
+		}
+
+		collectForApplication(remoteCollector);
 
 		if (!remoteCollectorAvailable) {
 			// on initialise les remoteCollectors au fur et à mesure
@@ -187,8 +250,27 @@ public class CollectorServer {
 				LOGGER.info("Periodic report scheduled for the application " + application + " to "
 						+ Parameter.ADMIN_EMAILS.getValue());
 			}
+
+			if (!remoteCollector.isAggregationApplication()) {
+				// Si l'ajout de l'application monitoré est un serveur Jenkins (master)
+				// et si le monitoring des nodes Jenkins (slaves et/ou master) n'a pas encore été ajouté,
+				// alors on ajoute le monitoring des nodes en même temps que le monitoring du master,
+				// (Si il n'y a pas de slaves pour ce master, alors le monitoring des nodes
+				// contient le master et les builds)
+				final String contextDisplayName = remoteCollector.getJavaInformationsList().get(0)
+						.getContextDisplayName();
+				final String jenkinsNodesApplication = application + JENKINS_NODES_SUFFIX;
+				if (contextDisplayName != null && contextDisplayName.startsWith("Jenkins")
+						&& !application.endsWith(JENKINS_NODES_SUFFIX)
+						&& !Parameters.getCollectorUrlsByApplications()
+								.containsKey(jenkinsNodesApplication)) {
+					// version réduite de addCollectorApplication (sans vérifier doublon d'url)
+					// avec une url /monitoring qui sera remplacée par /monitoring/nodes ci-dessus
+					Parameters.addCollectorApplication(jenkinsNodesApplication, urls);
+					collectForApplication(jenkinsNodesApplication, urls);
+				}
+			}
 		}
-		return messageForReport;
 	}
 
 	private String collectForApplication(RemoteCollector remoteCollector) throws IOException {
@@ -271,6 +353,10 @@ public class CollectorServer {
 	}
 
 	public void addCollectorApplication(String application, List<URL> urls) throws IOException {
+		if (Parameters.getApplicationsByAggregationApplication().containsKey(application)) {
+			throw new IOException("An aggregation " + application
+					+ " has already been added. Choose another name.");
+		}
 		final Map<String, List<URL>> collectorUrlsByApplications = Parameters
 				.getCollectorUrlsByApplications();
 		for (final URL addedUrl : urls) {
@@ -288,7 +374,7 @@ public class CollectorServer {
 				}
 			}
 		}
-		final List<URL> currentUrls = getUrlsByApplication(application);
+		final List<URL> currentUrls = Parameters.getCollectorUrlsByApplications().get(application);
 		final List<URL> nodesUrls;
 		if (currentUrls != null) {
 			nodesUrls = new ArrayList<URL>(currentUrls);
@@ -311,7 +397,7 @@ public class CollectorServer {
 
 	public void removeCollectorApplicationNodes(String appName, List<URL> nodeUrls)
 			throws IOException {
-		final List<URL> currentUrls = getUrlsByApplication(appName);
+		final List<URL> currentUrls = Parameters.getCollectorUrlsByApplications().get(appName);
 		if (currentUrls != null) {
 			final List<URL> newUrls = new ArrayList<URL>(currentUrls);
 			newUrls.removeAll(nodeUrls);
@@ -320,6 +406,59 @@ public class CollectorServer {
 				addCollectorApplication(appName, newUrls);
 			}
 		}
+	}
+
+	public void addCollectorAggregationApplication(String aggregationApplication,
+			List<String> aggregatedApplications) throws IOException {
+		if (Parameters.getApplicationsByAggregationApplication()
+				.containsKey(aggregationApplication)) {
+			throw new IOException("An aggregation " + aggregationApplication
+					+ " has already been added. Choose another name.");
+		}
+		if (Parameters.getCollectorUrlsByApplications().containsKey(aggregationApplication)) {
+			throw new IOException("An application " + aggregationApplication
+					+ " has already been added. Choose another name.");
+		}
+		if (aggregatedApplications.size() < 2) {
+			throw new IOException("Choose at least two applications to aggregate.");
+		}
+		mergeAggregatedApplications(aggregationApplication, aggregatedApplications);
+
+		Parameters.addCollectorAggregationApplication(aggregationApplication,
+				aggregatedApplications);
+		collectWithoutErrors();
+	}
+
+	private void mergeAggregatedApplications(String aggregationApplication,
+			List<String> aggregatedApplications) throws IOException {
+		final File targetDirectory = Parameters.getStorageDirectory(aggregationApplication);
+		if (!targetDirectory.mkdirs() && !targetDirectory.exists()) {
+			throw new IllegalArgumentException(targetDirectory + " can't be created");
+		}
+		if (targetDirectory.length() != 0) {
+			// on n'écrase pas les données précédentes si elles existent déjà
+			return;
+		}
+		final List<File> sourceDirectories = new ArrayList<File>();
+		for (final String aggregatedApplication : aggregatedApplications) {
+			sourceDirectories.add(Parameters.getStorageDirectory(aggregatedApplication));
+		}
+		final long start = System.currentTimeMillis();
+		LOGGER.info("merging data from the aggregated applications " + aggregatedApplications
+				+ " for aggregation application " + aggregationApplication);
+		final CollectorDataMerge collectorDataMerge = new CollectorDataMerge(sourceDirectories,
+				targetDirectory) {
+			@Override
+			protected void log(String msg) {
+				LOGGER.info(msg);
+			}
+		};
+		final int mergedFiles = collectorDataMerge.mergeDirectories();
+
+		final long durationInSeconds = Math.round((System.currentTimeMillis() - start) / 1000D);
+		LOGGER.info(mergedFiles + " files merged from the aggregated applications "
+				+ aggregatedApplications + " for aggregation application " + aggregationApplication
+				+ " in " + durationInSeconds + " s");
 	}
 
 	/**
@@ -356,11 +495,28 @@ public class CollectorServer {
 		return remoteCollector.getJavaInformationsList();
 	}
 
+	public List<URL> getUrlsByApplication(String application) {
+		assert application != null;
+		return getRemoteCollectorByApplication(application).getURLs();
+	}
+
 	private RemoteCollector getRemoteCollectorByApplication(String application) {
 		assert application != null;
 		final RemoteCollector remoteCollector = remoteCollectorsByApplication.get(application);
 		assert remoteCollector != null;
 		return remoteCollector;
+	}
+
+	private List<RemoteCollector> getAvailableRemoteCollectorsByApplications(
+			List<String> applications) {
+		final List<RemoteCollector> remoteCollectors = new ArrayList<RemoteCollector>();
+		for (final String application : applications) {
+			final RemoteCollector remoteCollector = remoteCollectorsByApplication.get(application);
+			if (remoteCollector != null) {
+				remoteCollectors.add(remoteCollector);
+			}
+		}
+		return remoteCollectors;
 	}
 
 	/**
@@ -455,10 +611,5 @@ public class CollectorServer {
 
 		// nettoyage avant le retrait de la webapp au cas où celui-ci ne suffise pas
 		remoteCollectorsByApplication.clear();
-	}
-
-	public static List<URL> getUrlsByApplication(String application) throws IOException {
-		assert application != null;
-		return Parameters.getCollectorUrlsByApplications().get(application);
 	}
 }

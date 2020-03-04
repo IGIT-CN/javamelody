@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -65,6 +65,7 @@ public final class JdbcWrapper {
 	static final AtomicInteger ACTIVE_THREAD_COUNT = new AtomicInteger();
 	static final AtomicInteger RUNNING_BUILD_COUNT = new AtomicInteger();
 	static final AtomicInteger BUILD_QUEUE_LENGTH = new AtomicInteger();
+	static final AtomicLong BUILD_QUEUE_WAITING_DURATIONS_SUM = new AtomicLong();
 	static final Map<Integer, ConnectionInformations> USED_CONNECTION_INFORMATIONS = new ConcurrentHashMap<Integer, ConnectionInformations>();
 
 	private static final int MAX_USED_CONNECTION_INFORMATIONS = 500;
@@ -124,10 +125,14 @@ public final class JdbcWrapper {
 					// executeUpdate(String, ...) ou execute(String sql),
 					// alors la requête sql est le premier argument (et pas query)
 					requestName = (String) args[0];
-				} else if ("executeBatch".equals(methodName)
+				} else if (("executeBatch".equals(methodName)
+						|| "executeLargeBatch".equals(methodName)) && requestName != null
 						&& !requestName.startsWith("/* BATCH */ ")) {
 					// if executeBatch, add a prefix in the request name to explain that
-					// 1 batch "hit" is equivalent to several exec of the request in the db
+					// 1 batch "hit" is equivalent to several exec of the request in the db.
+
+					// requestName may be null if executeBatch()
+					// without prepareStatement(String) or addBatch(String)
 					requestName = "/* BATCH */ " + requestName;
 				}
 
@@ -248,7 +253,8 @@ public final class JdbcWrapper {
 		public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 			final Object result = method.invoke(getProxiedObject(), args);
 			if (result instanceof Connection) {
-				SINGLETON.createConnectionProxyOrRewrapIfJBossOrGlassfish((Connection) result);
+				return SINGLETON
+						.createConnectionProxyOrRewrapIfJBossOrGlassfish((Connection) result);
 			}
 			return result;
 		}
@@ -348,6 +354,10 @@ public final class JdbcWrapper {
 		return BUILD_QUEUE_LENGTH.get();
 	}
 
+	public static long getBuildQueueWaitingDurationsSum() {
+		return BUILD_QUEUE_WAITING_DURATIONS_SUM.get();
+	}
+
 	public static List<ConnectionInformations> getConnectionInformationsList() {
 		final List<ConnectionInformations> result = new ArrayList<ConnectionInformations>(
 				USED_CONNECTION_INFORMATIONS.values());
@@ -407,7 +417,7 @@ public final class JdbcWrapper {
 
 			// note perf: selon un paramètre current-sql(/requests)-disabled,
 			// on pourrait ici ne pas binder un nouveau contexte à chaque requête sql
-			sqlCounter.bindContext(requestName, requestName, null, null, -1, -1);
+			sqlCounter.bindContext(requestName, requestName, null, -1, -1);
 
 			final Object result = method.invoke(statement, args);
 			systemError = false;

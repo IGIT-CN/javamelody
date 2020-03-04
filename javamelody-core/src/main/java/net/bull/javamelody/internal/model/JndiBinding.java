@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -163,7 +163,7 @@ public class JndiBinding implements Serializable {
 					} else {
 						sb.append(",\n");
 					}
-					sb.append(String.valueOf(aItem));
+					sb.append(aItem);
 				}
 				sb.append(']');
 				value = sb.toString();

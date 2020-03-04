@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -228,7 +228,6 @@ public class TestPdfOtherReport {
 	public void testWriteJndi() throws NamingException, IOException {
 		final String contextPath = "comp/env/";
 		final Context context = createNiceMock(Context.class);
-		@SuppressWarnings("unchecked")
 		final NamingEnumeration<Binding> enumeration = createNiceMock(NamingEnumeration.class);
 		expect(context.listBindings("java:" + contextPath)).andReturn(enumeration).anyTimes();
 		expect(enumeration.hasMore()).andReturn(true).times(6);
@@ -337,8 +336,8 @@ public class TestPdfOtherReport {
 		final Collector collector = new Collector("test", counters);
 		final JavaInformations javaInformations = new JavaInformations(null, true);
 
-		httpCounter.bindContext("test 1", "complete test 1", null, null, -1, -1);
-		sqlCounter.bindContext("sql1", "sql 1", null, null, -1, -1);
+		httpCounter.bindContext("test 1", "complete test 1", null, -1, -1);
+		sqlCounter.bindContext("sql1", "sql 1", null, -1, -1);
 		sqlCounter.addRequest("sql1", 100, 100, 100, false, -1);
 		httpCounter.addRequest("test 1", 0, 0, 0, false, 1000);
 		errorCounter.addRequestForSystemError("test error", 0, 0, 0, " a stack-trace");

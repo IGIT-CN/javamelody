@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -164,11 +164,10 @@ class HtmlCounterRequestGraphReport extends HtmlAbstractReport {
 	}
 
 	private void writeStackTrace(CounterRequest request) throws IOException {
-		for (final String element : request.getStackTrace().split("\n|\r")) {
+		for (final String element : request.getStackTrace().split("[\n\r]")) {
 			if (!element.isEmpty()) {
 				// writeDirectly pour ne pas gérer de traductions car les liens contiennent '#'
-				writeDirectly(HtmlSourceReport.htmlEncodeStackTraceElement(element).replaceAll("\t",
-						"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"));
+				writeDirectly(HtmlSourceReport.htmlEncodeStackTraceElementAndTabs(element));
 				writeDirectly("<br/>\n");
 			}
 		}

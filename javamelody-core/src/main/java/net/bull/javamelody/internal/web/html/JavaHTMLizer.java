@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -42,10 +42,10 @@ final class JavaHTMLizer {
 
 	private static final Map<Character, String> ESCAPE_MAPS = createEscapeMaps();
 
-	private static final Pattern MULTILINE_COMMENT_PATTERN = Pattern.compile("\\/\\*(.*?)\\*\\/",
+	private static final Pattern MULTILINE_COMMENT_PATTERN = Pattern.compile("/\\*(.*?)\\*/",
 			Pattern.DOTALL);
 
-	private static final Pattern SINGLELINE_COMMENT_PATTERN = Pattern.compile("\\/\\/(.*?)<br \\/>",
+	private static final Pattern SINGLELINE_COMMENT_PATTERN = Pattern.compile("//(.*?)<br />",
 			Pattern.DOTALL);
 
 	private static final Pattern STRING_PATTERN = Pattern.compile("&quot;(.*?)&quot;");
@@ -118,11 +118,7 @@ final class JavaHTMLizer {
 	}
 
 	private static String escapeChar(final char c) {
-		final String escaped = ESCAPE_MAPS.get(Character.valueOf(c));
-		if (escaped != null) {
-			return escaped;
-		}
-		return null;
+		return ESCAPE_MAPS.get(c);
 	}
 
 	private static String htmlEscape(final String text) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -203,7 +203,7 @@ class MelodyPanel extends JPanel {
 					final File tempFile = new File(System.getProperty("java.io.tmpdir"), PdfReport
 							.getFileName(application).replace(".pdf", "." + format.getCode()));
 					tempFile.deleteOnExit();
-					try (OutputStream output = createFileOutputStream(tempFile)) {
+					try (final OutputStream output = createFileOutputStream(tempFile)) {
 						format.writeSerializableTo(mySerializable, output);
 					}
 					Desktop.getDesktop().open(tempFile);

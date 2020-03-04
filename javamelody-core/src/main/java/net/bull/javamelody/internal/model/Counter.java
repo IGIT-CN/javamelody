@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -31,7 +31,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 
+import net.bull.javamelody.SessionListener;
 import net.bull.javamelody.internal.common.LOG;
 
 /**
@@ -414,21 +416,35 @@ public class Counter implements Cloneable, Serializable { // NOPMD
 	}
 
 	public void bindContextIncludingCpu(String requestName) {
-		bindContext(requestName, requestName, null, null,
-				ThreadInformations.getCurrentThreadCpuTime(),
+		bindContext(requestName, requestName, null, ThreadInformations.getCurrentThreadCpuTime(),
 				ThreadInformations.getCurrentThreadAllocatedBytes());
 	}
 
 	public void bindContext(String requestName, String completeRequestName,
-			HttpServletRequest httpRequest, String remoteUser, long startCpuTime,
-			long startAllocatedBytes) {
+			HttpServletRequest httpRequest, long startCpuTime, long startAllocatedBytes) {
+		String remoteUser = null;
+		String sessionId = null;
+		if (httpRequest != null) {
+			remoteUser = httpRequest.getRemoteUser();
+			final HttpSession session = httpRequest.getSession(false);
+			if (session != null) {
+				sessionId = session.getId();
+				if (remoteUser == null) {
+					final Object userAttribute = session
+							.getAttribute(SessionListener.SESSION_REMOTE_USER);
+					if (userAttribute instanceof String) {
+						remoteUser = (String) userAttribute;
+					}
+				}
+			}
+		}
 		// requestName est la même chose que ce qui sera utilisée dans addRequest,
 		// completeRequestName est la même chose éventuellement complétée
 		// pour cette requête à destination de l'affichage dans les requêtes courantes
 		// (sinon mettre 2 fois la même chose)
 		final CounterRequestContext context = new CounterRequestContext(this,
 				contextThreadLocal.get(), requestName, completeRequestName, httpRequest, remoteUser,
-				startCpuTime, startAllocatedBytes);
+				startCpuTime, startAllocatedBytes, sessionId);
 		contextThreadLocal.set(context);
 		if (context.getParentContext() == null) {
 			rootCurrentContextsByThreadId.put(context.getThreadId(), context);
@@ -468,13 +484,13 @@ public class Counter implements Cloneable, Serializable { // NOPMD
 	}
 
 	public void addRequest(String requestName, long duration, int cpuTime, int allocatedKBytes,
-			boolean systemError, int responseSize) {
+			boolean systemError, long responseSize) {
 		addRequest(requestName, duration, cpuTime, allocatedKBytes, systemError, null,
 				responseSize);
 	}
 
 	private void addRequest(String requestName, long duration, int cpuTime, int allocatedKBytes,
-			boolean systemError, String systemErrorStackTrace, int responseSize) {
+			boolean systemError, String systemErrorStackTrace, long responseSize) {
 		// la méthode addRequest n'est pas synchronisée pour ne pas avoir
 		// de synchronisation globale à l'application sur cette instance d'objet
 		// ce qui pourrait faire une contention et des ralentissements,
@@ -484,7 +500,7 @@ public class Counter implements Cloneable, Serializable { // NOPMD
 		assert duration >= 0;
 		assert cpuTime >= -1; // -1 pour requêtes sql
 		assert allocatedKBytes >= -1; // -1 pour requêtes sql
-		assert responseSize >= -1; // -1 pour requêtes sql
+		assert responseSize >= -1L; // -1 pour requêtes sql
 
 		final String aggregateRequestName = getAggregateRequestName(requestName);
 
@@ -776,6 +792,24 @@ public class Counter implements Cloneable, Serializable { // NOPMD
 	}
 
 	/**
+	 * Retourne l'objet {@link CounterRequest} correspondant à l'id en paramètre ou null sinon.
+	 * @param requestId Id de la requête
+	 * @return CounterRequest
+	 */
+	public CounterRequest getCounterRequestById(String requestId) {
+		if (isRequestIdFromThisCounter(requestId)) {
+			for (final CounterRequest request : requests.values()) {
+				if (request.getId().equals(requestId)) {
+					synchronized (request) {
+						return request.clone();
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Retourne le nombre de requêtes dans ce counter.
 	 * @return int
 	 */
@@ -874,12 +908,12 @@ public class Counter implements Cloneable, Serializable { // NOPMD
 	}
 
 	/**
-	 * Purge les requêtes, requêtes en cours et erreurs puis positionne la date et heure de début
-	 * à l'heure courante.
+	 * Purge les requêtes et erreurs puis positionne la date et heure de début à l'heure courante,
+	 * mais sans toucher aux requêtes en cours pour qu'elles restent affichées,
+	 * par exemple dans le serveur de collecte (#871).
 	 */
 	public void clear() {
 		requests.clear();
-		rootCurrentContextsByThreadId.clear();
 		if (errors != null) {
 			synchronized (errors) {
 				errors.clear();

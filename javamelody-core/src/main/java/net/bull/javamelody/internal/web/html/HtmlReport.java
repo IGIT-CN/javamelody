@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -23,6 +23,7 @@ import java.io.Writer;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import net.bull.javamelody.internal.model.CounterRequestContext;
 import net.bull.javamelody.internal.model.DatabaseInformations;
 import net.bull.javamelody.internal.model.HeapHistogram;
 import net.bull.javamelody.internal.model.HsErrPid;
+import net.bull.javamelody.internal.model.JCacheInformations;
 import net.bull.javamelody.internal.model.JavaInformations;
 import net.bull.javamelody.internal.model.JndiBinding;
 import net.bull.javamelody.internal.model.MBeanNode;
@@ -108,9 +110,9 @@ public class HtmlReport extends HtmlAbstractReport {
 		writeHtmlFooter();
 	}
 
-	public static void writeAddAndRemoveApplicationLinks(String currentApplication, Writer writer)
-			throws IOException {
-		HtmlCoreReport.writeAddAndRemoveApplicationLinks(currentApplication, writer);
+	public static void writeAddAndRemoveApplicationLinks(String currentApplication,
+			Collection<String> applications, Writer writer) throws IOException {
+		HtmlCoreReport.writeAddAndRemoveApplicationLinks(currentApplication, applications, writer);
 	}
 
 	public void writeAllCurrentRequestsAsPart() throws IOException {
@@ -412,17 +414,32 @@ public class HtmlReport extends HtmlAbstractReport {
 	public void writeCacheWithKeys(String cacheId, CacheInformations cacheInformations,
 			String message, String cacheKeyPart, boolean withoutHeaders) throws IOException {
 		assert cacheId != null;
-		if (cacheInformations != null) {
-			final HtmlCacheInformationsReport htmlCacheInformationsReport = new HtmlCacheInformationsReport(
-					Collections.singletonList(cacheInformations), getWriter());
-			if (withoutHeaders) {
-				htmlCacheInformationsReport.writeCacheWithKeys(cacheId, withoutHeaders);
-			} else {
-				writeHtmlHeader();
-				htmlCacheInformationsReport.writeCacheWithKeys(cacheId, withoutHeaders);
-				writeHtmlFooter();
-				writeMessageIfNotNull(message, cacheKeyPart);
-			}
+		assert cacheInformations != null;
+		final HtmlCacheInformationsReport htmlCacheInformationsReport = new HtmlCacheInformationsReport(
+				Collections.singletonList(cacheInformations), getWriter());
+		if (withoutHeaders) {
+			htmlCacheInformationsReport.writeCacheWithKeys(cacheId, withoutHeaders);
+		} else {
+			writeHtmlHeader();
+			htmlCacheInformationsReport.writeCacheWithKeys(cacheId, withoutHeaders);
+			writeHtmlFooter();
+			writeMessageIfNotNull(message, cacheKeyPart);
+		}
+	}
+
+	public void writeJCacheWithKeys(String cacheId, JCacheInformations jcacheInformations,
+			String message, String cacheKeyPart, boolean withoutHeaders) throws IOException {
+		assert cacheId != null;
+		assert jcacheInformations != null;
+		final HtmlJCacheInformationsReport htmlJCacheInformationsReport = new HtmlJCacheInformationsReport(
+				Collections.singletonList(jcacheInformations), getWriter());
+		if (withoutHeaders) {
+			htmlJCacheInformationsReport.writeJCacheWithKeys(cacheId, withoutHeaders);
+		} else {
+			writeHtmlHeader();
+			htmlJCacheInformationsReport.writeJCacheWithKeys(cacheId, withoutHeaders);
+			writeHtmlFooter();
+			writeMessageIfNotNull(message, cacheKeyPart);
 		}
 	}
 

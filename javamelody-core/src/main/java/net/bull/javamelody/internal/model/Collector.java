@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -68,6 +68,7 @@ public class Collector { // NOPMD
 	private long tomcatBytesReceived = NOT_A_NUMBER;
 	private long tomcatBytesSent = NOT_A_NUMBER;
 	private long lastCollectDuration;
+	private Throwable lastCollectorException;
 	private long estimatedMemorySize;
 	private long diskUsage;
 	private Date lastDateOfDeletedObsoleteFiles = new Date();
@@ -217,6 +218,10 @@ public class Collector { // NOPMD
 		return lastCollectDuration;
 	}
 
+	public Throwable getLastCollectorException() {
+		return lastCollectorException;
+	}
+
 	public long getEstimatedMemorySize() {
 		return estimatedMemorySize;
 	}
@@ -313,7 +318,7 @@ public class Collector { // NOPMD
 			collectWithoutErrors(Collections.singletonList(javaInformations));
 		} catch (final Throwable t) { // NOPMD
 			// include cause in message for debugging logs in the report
-			LOG.warn("exception while collecting data: " + t.toString(), t);
+			LOG.warn("exception while collecting data: " + t, t);
 		}
 	}
 
@@ -322,9 +327,11 @@ public class Collector { // NOPMD
 		final long start = System.currentTimeMillis();
 		try {
 			estimatedMemorySize = collect(javaInformationsList);
+			lastCollectorException = null;
 		} catch (final Throwable t) { // NOPMD
+			lastCollectorException = t;
 			// include cause in message for debugging logs in the report
-			LOG.warn("exception while collecting data: " + t.toString(), t);
+			LOG.warn("exception while collecting data: " + t, t);
 		}
 		// note : on n'inclue pas "new JavaInformations" de collectLocalContextWithoutErrors
 		// dans la durée de la collecte mais il est inférieur à 1 ms (sans bdd)
@@ -434,6 +441,7 @@ public class Collector { // NOPMD
 		double systemLoadAverage = 0;
 		long unixOpenFileDescriptorCount = 0;
 		long freeDiskSpaceInTemp = Long.MAX_VALUE;
+		long usableDiskSpaceInTemp = Long.MAX_VALUE;
 		double systemCpuLoad = 0;
 
 		for (final JavaInformations javaInformations : javaInformationsList) {
@@ -461,11 +469,11 @@ public class Collector { // NOPMD
 			// que sur linx ou unix
 			unixOpenFileDescriptorCount = add(javaInformations.getUnixOpenFileDescriptorCount(),
 					unixOpenFileDescriptorCount);
-			if (javaInformations.getFreeDiskSpaceInTemp() >= 0) {
-				// la valeur retenue est le minimum entre les serveurs
-				freeDiskSpaceInTemp = Math.min(javaInformations.getFreeDiskSpaceInTemp(),
-						freeDiskSpaceInTemp);
-			}
+			// la valeur retenue est le minimum entre les serveurs
+			freeDiskSpaceInTemp = Math.min(javaInformations.getFreeDiskSpaceInTemp(),
+					freeDiskSpaceInTemp);
+			usableDiskSpaceInTemp = Math.min(javaInformations.getUsableDiskSpaceInTemp(),
+					usableDiskSpaceInTemp);
 			systemCpuLoad = add(javaInformations.getSystemCpuLoad(), systemCpuLoad);
 		}
 
@@ -515,6 +523,9 @@ public class Collector { // NOPMD
 
 		if (freeDiskSpaceInTemp != Long.MAX_VALUE) {
 			addJRobinValue(getOtherJRobin("Free_disk_space"), freeDiskSpaceInTemp);
+		}
+		if (usableDiskSpaceInTemp != Long.MAX_VALUE) {
+			addJRobinValue(getOtherJRobin("Usable_disk_space"), usableDiskSpaceInTemp);
 		}
 
 		// on pourrait collecter la valeur 100 dans jrobin pour qu'il fasse la moyenne
@@ -595,6 +606,8 @@ public class Collector { // NOPMD
 		if (getCounterByName(Counter.BUILDS_COUNTER_NAME) != null) {
 			addJRobinValue(getCounterJRobin("runningBuilds"), JdbcWrapper.getRunningBuildCount());
 			addJRobinValue(getCounterJRobin("buildQueueLength"), JdbcWrapper.getBuildQueueLength());
+			addJRobinValue(getCounterJRobin("buildQueueWaiting"),
+					JdbcWrapper.getBuildQueueWaitingDurationsSum() / 1000d);
 		}
 	}
 
@@ -780,7 +793,6 @@ public class Collector { // NOPMD
 				// différentes en éliminant celles ayant moins de 10 hits.
 				removeRequest(counter, request);
 				result.remove(request);
-				continue;
 			}
 		}
 		while (result.size() > maxRequestsCount && !result.isEmpty()) {

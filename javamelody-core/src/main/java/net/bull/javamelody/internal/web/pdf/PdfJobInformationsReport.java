@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2017 by Emeric Vernat
+ * Copyright 2008-2019 by Emeric Vernat
  *
  *     This file is part of Java Melody.
  *
@@ -152,7 +152,7 @@ class PdfJobInformationsReport extends PdfAbstractTableReport {
 			final Image memoryImage = Image
 					.getInstance(Bar.toBar(100d * elapsedTime / counterRequest.getMean()), null);
 			memoryImage.scalePercent(47);
-			elapsedTimePhrase.add("\n");
+			elapsedTimePhrase.add(new Chunk("\n"));
 			elapsedTimePhrase.add(new Chunk(memoryImage, 0, 0));
 			addCell(elapsedTimePhrase);
 		} else {
